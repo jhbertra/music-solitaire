@@ -1,20 +1,64 @@
 ﻿module Core
 
 //
-// --------- Validation Result ---------
+// --------- State ---------
 //
 
-type Error =
-    | Stub
+type State<'s,'v> = State of ('s -> 'v * 's)
 
-type Result<'a> =
+let runState state initial =
+    match state with State f -> f initial
+
+type StateBuilder() =
+
+    member this.Return(x) =
+        State (fun s -> x,s)
+
+    member this.Bind(m, f) =
+        State (fun s ->
+            let (v, newState) = runState m s
+            runState (f v) newState)
+
+    member this.Zero() =
+        State(fun s -> (),s)
+
+
+
+let get = State (fun s -> (s,s))
+
+let put newState = State (fun s -> ((), newState))
+
+let modify f =
+    let state = new StateBuilder() 
+    state {
+        let! x = get
+        do! put (f x)
+    }
+
+let gets f =
+    let state = new StateBuilder() 
+    state {
+        let! x = get
+        return f x
+    }
+
+let evalState state initial =
+    runState state initial
+    |> fst
+
+let execState state initial =
+    runState state initial
+    |> snd
+
+
+
+//
+// --------- Result ---------
+//
+
+type Result<'a,'e> =
     | Success of 'a
-    | Failure of Error
-
-let onSuccess result next = 
-    match result with
-    | Success a -> next a
-    | Failure e -> Failure e
+    | Failure of 'e
 
 type ResultBuilder() =
 

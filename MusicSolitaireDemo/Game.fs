@@ -1,6 +1,6 @@
 ﻿module Game
 
-
+open Core
 
 //
 // --------- Model ---------
@@ -73,24 +73,25 @@ type DealState = DealState of Card list * Deck * Location * TableauNumber
 
 
 //
+// --------- Msg ---------
+//
+
+
+
+//
+// --------- Error ---------
+//
+
+
+
+//
 // --------- Init ---------
 //
 
-let initDeck = 
+let initCards = 
     [for suit in suits do
         for face in faces do
             yield Card (suit, face)]
-
-let shuffle (rng: System.Random) arr =
-    let array = Array.copy arr
-    let n = array.Length
-    for x in 1..n do
-        let i = n-x
-        let j = rng.Next(i+1)
-        let tmp = array.[i]
-        array.[i] <- array.[j]
-        array.[j] <- tmp
-    array
 
 let nextTableauNumber number =
     match number with
@@ -120,8 +121,14 @@ let rec deal dealState =
 
 let dealDeck rng =
     let cards = 
-        initDeck
+        initCards
         |> Array.ofList
         |> shuffle rng
         |> List.ofArray
     deal (DealState (cards, Deck [], Tableau (One, FaceUp), One))
+
+
+
+//
+// --------- Update ---------
+//
