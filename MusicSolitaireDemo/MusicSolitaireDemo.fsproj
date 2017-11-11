@@ -98,6 +98,8 @@
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
     <None Include="packages.config" />
+    <Compile Include="Core.fs" />
+    <Compile Include="Game.fs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />
 </Project>
