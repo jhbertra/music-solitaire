@@ -1,5 +1,11 @@
 ﻿module Game
 
+
+
+//
+// --------- Model ---------
+//
+
 type Suit =
     | Hearts
     | Clubs
@@ -62,13 +68,20 @@ type DealtCard = DealtCard of Card * Location
 
 type Deck = Deck of DealtCard list
 
+type DealState = DealState of Card list * Deck * Location * TableauNumber
+
+
+
+//
+// --------- Init ---------
+//
+
 let initDeck = 
     [for suit in suits do
         for face in faces do
             yield Card (suit, face)]
 
-let rng = new System.Random()
-let shuffle arr =
+let shuffle (rng: System.Random) arr =
     let array = Array.copy arr
     let n = array.Length
     for x in 1..n do
@@ -78,8 +91,6 @@ let shuffle arr =
         array.[i] <- array.[j]
         array.[j] <- tmp
     array
-
-type DealState = DealState of Card list * Deck * Location * TableauNumber
 
 let nextTableauNumber number =
     match number with
@@ -107,15 +118,10 @@ let rec deal dealState =
         let (newLocation, newTableauPass) = nextLocation location tableauPass
         deal (DealState (remaining, Deck (DealtCard (card, location) :: cardsInDeck), newLocation, newTableauPass))
 
-let dealDeck =
+let dealDeck rng =
     let cards = 
         initDeck
         |> Array.ofList
-        |> shuffle
+        |> shuffle rng
         |> List.ofArray
     deal (DealState (cards, Deck [], Tableau (One, FaceUp), One))
-
-type GameState =
-    {
-    deck : Deck
-    }
