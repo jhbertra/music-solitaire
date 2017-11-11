@@ -94,15 +94,8 @@
     <None Include="Info.plist" />
     <None Include="Entitlements.plist" />
     <InterfaceDefinition Include="Main.storyboard" />
-    <Compile Include="ViewController.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\MusicSolitaireDemo.Core\MusicSolitaireDemo.Core.fsproj">
-      <Project>{7B47C76B-F265-46D8-B7B4-05EA1E10D898}</Project>
-      <Name>MusicSolitaireDemo</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />
 </Project>
