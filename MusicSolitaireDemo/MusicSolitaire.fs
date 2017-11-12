@@ -188,7 +188,7 @@ let initModel rng = {
 //
 
 type Msg =
-    | DealNextCard
+    | DealCards
     | PopStock
 
 
@@ -206,7 +206,7 @@ let update msg model =
     | DealPhase dealModel -> 
         match msg with
 
-        | DealNextCard ->
+        | DealCards ->
             match dealModel.deck with
             | [] -> { model with phase = PlayingPhase },Term
             | card :: remainingDeck -> 
@@ -221,7 +221,7 @@ let update msg model =
                     | Six,faceUp -> { model with tableau6 = updateTableau model.tableau6 faceUp card; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
                     | Seven,faceUp -> { model with tableau7 = updateTableau model.tableau7 faceUp card; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
                 | [] -> { model with stock = card :: model.stock; phase = DealPhase { deck = remainingDeck; tableauDealMoves = [] } }
-                ,Msg DealNextCard
+                ,Msg DealCards
 
         | _ -> model,Term
 
@@ -257,19 +257,19 @@ let update msg model =
 // --------- Cmd --------
 //
 
-let rec runCmd updateFn cmd = 
+let rec runCmd cmd = 
     state {
         let! model = getState
         match cmd with
         | Term -> return model
         | Msg msg -> 
-            let newModel,nextCmd = updateFn msg model
+            let newModel,nextCmd = update msg model
             do! putState newModel
-            return! runCmd updateFn nextCmd
+            return! runCmd nextCmd
         }
 
-let execGameState updateFn cmd model =
-    let gameStateBuilder = runCmd updateFn cmd
+let execGameState cmd model =
+    let gameStateBuilder = runCmd cmd
     execState gameStateBuilder model
 
 
