@@ -11,6 +11,7 @@ type Suit =
     | Clubs
     | Diamonds
     | Spades
+let suits = [ Hearts; Clubs; Diamonds; Spades ]
 
 type Face =
     | KeySignature
@@ -25,23 +26,7 @@ type Face =
     | IV
     | V
     | I
-
-let suits = [ Hearts; Clubs; Diamonds; Spades ]
-let faces = 
-    [ 
-    KeySignature
-    Do
-    Re
-    Me
-    Fa
-    So
-    La
-    Ti
-    Do8
-    IV
-    V
-    I
-    ]
+let faces = [ KeySignature; Do; Re; Me; Fa; So; La; Ti; Do8; IV; V; I ]
 
 type Card = Card of Suit * Face
 
@@ -70,101 +55,20 @@ type Piles = {
     clubsFoundation : Card list
     }
 
-let tableauDealMoves = [
-    One,true
-    Two,false
-    Three,false
-    Four,false
-    Five,false
-    Six,false
-    Seven,false
-
-    Two,true
-    Three,false
-    Four,false
-    Five,false
-    Six,false
-    Seven,false
-
-    Three,true
-    Four,false
-    Five,false
-    Six,false
-    Seven,false
-
-    Four,true
-    Five,false
-    Six,false
-    Seven,false
-
-    Five,true
-    Six,false
-    Seven,false
-
-    Six,true
-    Seven,false
-
-    Seven,true
-    ]
-
-type InitModel = {
+type DealPhaseModel = {
     deck : Card list
     tableauDealMoves : (TableauNumber*bool) list
-    piles : Piles
     }
 
-type Model = 
-    | InitPhase of InitModel
+type GamePhase =
+    | DealPhase of DealPhaseModel
     | PlayingPhase
     | DonePhase
 
-//
-// --------- Msg ---------
-//
-
-type Msg =
-    | DealNextCard
-
-
-
-//
-// --------- Update ---------
-//
-
-let updateTableau tableau faceUp card =
-    match tableau with down,_ -> if faceUp then [card],down else card::[],down
-
-let update msg model =
-    match model with
-
-    | InitPhase initModel -> 
-        match msg with
-        | DealNextCard ->
-            match initModel.deck with
-            | [] -> PlayingPhase,Term
-            | card :: remaining -> 
-                let newPiles,newMoves =
-                    match initModel.tableauDealMoves with
-                    | move :: tail -> 
-                        match move with
-                        | One,_ -> { initModel.piles with tableau1 = [card] },tail
-                        | Two,faceUp -> { initModel.piles with tableau2 = updateTableau initModel.piles.tableau2 faceUp card },tail
-                        | Three,faceUp -> { initModel.piles with tableau3 = updateTableau initModel.piles.tableau3 faceUp card },tail
-                        | Four,faceUp -> { initModel.piles with tableau4 = updateTableau initModel.piles.tableau4 faceUp card },tail
-                        | Five,faceUp -> { initModel.piles with tableau5 = updateTableau initModel.piles.tableau5 faceUp card },tail
-                        | Six,faceUp -> { initModel.piles with tableau6 = updateTableau initModel.piles.tableau6 faceUp card },tail
-                        | Seven,faceUp -> { initModel.piles with tableau7 = updateTableau initModel.piles.tableau7 faceUp card },tail
-                    | [] -> { initModel.piles with stock = card::initModel.piles.stock },[]
-                InitPhase 
-                    { initModel with 
-                        deck = remaining
-                        tableauDealMoves = newMoves
-                        piles = newPiles
-                        }
-                    ,Msg DealNextCard
-
-    | PlayingPhase -> model,Term
-    | DonePhase -> model,Term
+type Model = {
+    phase : GamePhase
+    piles : Piles
+    }
 
 
 
@@ -176,6 +80,12 @@ let initCards =
     [for suit in suits do
         for face in faces do
             yield Card (suit, face)]
+
+let initTableauDealMoves = 
+    let numberOrder = [One;Two;Three;Four;Five;Six;Seven]
+    numberOrder
+    |> List.mapi (fun i _ -> (List.skip i numberOrder) |> List.mapi (fun j num -> num,j=0))
+    |> List.collect (fun pass -> pass)
 
 let initPiles = {
     stock = []
@@ -193,10 +103,62 @@ let initPiles = {
     clubsFoundation = []
     }
 
-let initGame rng =
-    let deck = 
-        initCards
-        |> Array.ofList
-        |> shuffle rng
-        |> List.ofArray
-    runGameState update (Msg DealNextCard) (InitPhase { deck = deck; tableauDealMoves = tableauDealMoves; piles = initPiles })
+let initModel rng = {
+    phase = DealPhase {
+        deck = 
+            initCards
+            |> Array.ofList
+            |> shuffleArr rng
+            |> List.ofArray
+        tableauDealMoves = initTableauDealMoves
+        }
+    piles = initPiles
+    }
+
+
+
+//
+// --------- Msg ---------
+//
+
+type Msg =
+    | DealNextCard
+
+
+
+//
+// --------- Update ---------
+//
+
+let updateTableau tableau faceUp card =
+    match tableau with up,down -> if faceUp then card::up,down else up,card::down
+
+let update msg model =
+    match model.phase with
+
+    | DealPhase dealModel -> 
+        match msg with
+        | DealNextCard ->
+            match dealModel.deck with
+            | [] -> { model with phase = PlayingPhase },Term
+            | card :: remaining -> 
+                let newPiles,newMoves =
+                    match dealModel.tableauDealMoves with
+                    | move :: tail -> 
+                        match move with
+                        | One,_ -> { model.piles with tableau1 = [card] },tail
+                        | Two,faceUp -> { model.piles with tableau2 = updateTableau model.piles.tableau2 faceUp card },tail
+                        | Three,faceUp -> { model.piles with tableau3 = updateTableau model.piles.tableau3 faceUp card },tail
+                        | Four,faceUp -> { model.piles with tableau4 = updateTableau model.piles.tableau4 faceUp card },tail
+                        | Five,faceUp -> { model.piles with tableau5 = updateTableau model.piles.tableau5 faceUp card },tail
+                        | Six,faceUp -> { model.piles with tableau6 = updateTableau model.piles.tableau6 faceUp card },tail
+                        | Seven,faceUp -> { model.piles with tableau7 = updateTableau model.piles.tableau7 faceUp card },tail
+                    | [] -> { model.piles with stock = card::model.piles.stock },[]
+                { model with 
+                    phase = DealPhase { deck = remaining; tableauDealMoves = newMoves }
+                    piles = newPiles
+                    }
+                ,Msg DealNextCard
+
+    | PlayingPhase -> model,Term
+    | DonePhase -> model,Term
