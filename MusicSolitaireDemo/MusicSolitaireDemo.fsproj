@@ -95,11 +95,11 @@
     <ImageAsset Include="Assets.xcassets\Contents.json" />
     <None Include="Info.plist" />
     <None Include="Entitlements.plist" />
-    <Compile Include="AppDelegate.fs" />
-    <Compile Include="Main.fs" />
     <None Include="packages.config" />
     <Compile Include="Core.fs" />
     <Compile Include="Game.fs" />
+    <Compile Include="AppDelegate.fs" />
+    <Compile Include="Main.fs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />
 </Project>
