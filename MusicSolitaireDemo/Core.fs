@@ -53,17 +53,12 @@ let execState state initial =
 
 
 //
-// --------- Cmd ---------
+// --------- Other Stuff ---------
 //
 
 type Cmd<'a> =
     | Term
     | Msg of 'a
-
-
-//
-// --------- Other Stuff ---------
-//
 
 let shuffleArr (rng: Random) arr =
     let array = Array.copy arr
