@@ -54,33 +54,117 @@ type TableauNumber =
     | Six
     | Seven
 
-type TableauState =
-    | FaceDown
-    | FaceUp
+type Piles = {
+    stock : Card list
+    talon : Card list
+    tableau1 : Card list
+    tableau2 : Card list * Card list
+    tableau3 : Card list * Card list
+    tableau4 : Card list * Card list
+    tableau5 : Card list * Card list
+    tableau6 : Card list * Card list
+    tableau7 : Card list * Card list
+    heartsFoundation : Card list
+    spadesFoundation : Card list
+    diamondsFoundation : Card list
+    clubsFoundation : Card list
+    }
 
-type Location =
-    | Tableau of TableauNumber * TableauState
-    | Foundation of Suit
-    | Stock
-    | Waste
+let tableauDealMoves = [
+    One,true
+    Two,false
+    Three,false
+    Four,false
+    Five,false
+    Six,false
+    Seven,false
 
-type DealtCard = DealtCard of Card * Location
+    Two,true
+    Three,false
+    Four,false
+    Five,false
+    Six,false
+    Seven,false
 
-type Deck = Deck of DealtCard list
+    Three,true
+    Four,false
+    Five,false
+    Six,false
+    Seven,false
 
-type DealState = DealState of Card list * Deck * Location * TableauNumber
+    Four,true
+    Five,false
+    Six,false
+    Seven,false
 
+    Five,true
+    Six,false
+    Seven,false
 
+    Six,true
+    Seven,false
+
+    Seven,true
+    ]
+
+type InitModel = {
+    deck : Card list
+    tableauDealMoves : (TableauNumber*bool) list
+    piles : Piles
+    }
+
+type Model = 
+    | InitPhase of InitModel
+    | PlayingPhase
+    | DonePhase
 
 //
 // --------- Msg ---------
 //
 
+type Msg =
+    | DealNextCard
+
 
 
 //
-// --------- Error ---------
+// --------- Update ---------
 //
+
+let updateTableau tableau faceUp card =
+    match tableau with down,_ -> if faceUp then [card],down else card::[],down
+
+let update msg model =
+    match model with
+
+    | InitPhase initModel -> 
+        match msg with
+        | DealNextCard ->
+            match initModel.deck with
+            | [] -> PlayingPhase,Term
+            | card :: remaining -> 
+                let newPiles,newMoves =
+                    match initModel.tableauDealMoves with
+                    | move :: tail -> 
+                        match move with
+                        | One,_ -> { initModel.piles with tableau1 = [card] },tail
+                        | Two,faceUp -> { initModel.piles with tableau2 = updateTableau initModel.piles.tableau2 faceUp card },tail
+                        | Three,faceUp -> { initModel.piles with tableau3 = updateTableau initModel.piles.tableau3 faceUp card },tail
+                        | Four,faceUp -> { initModel.piles with tableau4 = updateTableau initModel.piles.tableau4 faceUp card },tail
+                        | Five,faceUp -> { initModel.piles with tableau5 = updateTableau initModel.piles.tableau5 faceUp card },tail
+                        | Six,faceUp -> { initModel.piles with tableau6 = updateTableau initModel.piles.tableau6 faceUp card },tail
+                        | Seven,faceUp -> { initModel.piles with tableau7 = updateTableau initModel.piles.tableau7 faceUp card },tail
+                    | [] -> { initModel.piles with stock = card::initModel.piles.stock },[]
+                InitPhase 
+                    { initModel with 
+                        deck = remaining
+                        tableauDealMoves = newMoves
+                        piles = newPiles
+                        }
+                    ,Msg DealNextCard
+
+    | PlayingPhase -> model,Term
+    | DonePhase -> model,Term
 
 
 
@@ -93,42 +177,26 @@ let initCards =
         for face in faces do
             yield Card (suit, face)]
 
-let nextTableauNumber number =
-    match number with
-    | One -> Two
-    | Two -> Three
-    | Three -> Four
-    | Four -> Five
-    | Five -> Six
-    | Six -> Seven
-    | Seven -> Seven
+let initPiles = {
+    stock = []
+    talon = []
+    tableau1 = []
+    tableau2 = [],[]
+    tableau3 = [],[]
+    tableau4 = [],[]
+    tableau5 = [],[]
+    tableau6 = [],[]
+    tableau7 = [],[]
+    heartsFoundation = []
+    spadesFoundation = []
+    diamondsFoundation = []
+    clubsFoundation = []
+    }
 
-let nextLocation current tableauPass =
-    match current with
-    | Stock | Tableau (Seven, FaceUp) -> (Stock, Seven)
-    | Tableau (Seven, FaceDown) -> (Tableau (nextTableauNumber tableauPass, FaceUp), nextTableauNumber tableauPass)
-    | Tableau (n, f) -> (Tableau (nextTableauNumber n, FaceDown), tableauPass)
-    | _ -> (current, tableauPass)
-
-let rec deal dealState =
-    let (cards, deck, location, tableauPass) = match dealState with DealState (c,d,l,p) -> (c,d,l,p)
-    let cardsInDeck = match deck with Deck c -> c
-    match cards with
-    | [] -> deck
-    | card :: remaining -> 
-        let (newLocation, newTableauPass) = nextLocation location tableauPass
-        deal (DealState (remaining, Deck (DealtCard (card, location) :: cardsInDeck), newLocation, newTableauPass))
-
-let dealDeck rng =
-    let cards = 
+let initGame rng =
+    let deck = 
         initCards
         |> Array.ofList
         |> shuffle rng
         |> List.ofArray
-    deal (DealState (cards, Deck [], Tableau (One, FaceUp), One))
-
-
-
-//
-// --------- Update ---------
-//
+    runGameState update (Msg DealNextCard) (InitPhase { deck = deck; tableauDealMoves = tableauDealMoves; piles = initPiles })
