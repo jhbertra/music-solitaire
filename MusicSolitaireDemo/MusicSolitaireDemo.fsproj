@@ -96,9 +96,7 @@
     <None Include="Info.plist" />
     <None Include="Entitlements.plist" />
     <None Include="packages.config" />
-    <Compile Include="Core.fs" />
-    <Compile Include="Game.fs" />
-    <Compile Include="Platform.fs" />
+    <Compile Include="MusicSolitaire.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

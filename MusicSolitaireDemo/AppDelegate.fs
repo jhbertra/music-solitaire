@@ -3,7 +3,7 @@
 open UIKit
 open Foundation
 
-open Platform
+open MusicSolitaire
 
 [<Register ("AppDelegate")>]
 type AppDelegate () =
@@ -13,6 +13,6 @@ type AppDelegate () =
 
     // This method is invoked when the application is ready to run.
     override this.FinishedLaunching (app, options) =
-        let game = new Game()
+        let game = new MusicSolitaireGame()
         game.Run()
         true
