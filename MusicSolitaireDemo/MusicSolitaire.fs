@@ -90,16 +90,16 @@ type Face =
     | KeySignature
     | Do
     | Re
-    | Me
+    | Mi
     | Fa
     | So
     | La
-    | Te
+    | Ti
     | Do8
     | IV
     | V
     | I
-let faces = [ KeySignature; Do; Re; Me; Fa; So; La; Te; Do8; IV; V; I ]
+let faces = [ KeySignature; Do; Re; Mi; Fa; So; La; Ti; Do8; IV; V; I ]
 
 type Card = Suit * Face
 
@@ -213,12 +213,12 @@ let updateTableau tableau faceUp card =
 let isFace2Higher face1 face2 =
     face1 = KeySignature && face2 = Do
     || face1 = Do && face2 = Re
-    || face1 = Re && face2 = Me
-    || face1 = Me && face2 = Fa
+    || face1 = Re && face2 = Mi
+    || face1 = Mi && face2 = Fa
     || face1 = Fa && face2 = So
     || face1 = So && face2 = La
-    || face1 = La && face2 = Te
-    || face1 = Te && face2 = Do8
+    || face1 = La && face2 = Ti
+    || face1 = Ti && face2 = Do8
     || face1 = Do8 && face2 = IV
     || face1 = IV && face2 = V
     || face1 = V && face2 = I
@@ -539,14 +539,32 @@ let update msg model =
 
 open Microsoft.Xna.Framework
 
-type MusicSolitaireGame(model : Model, initialCmd : Cmd<Msg>) as this =
+type MusicSolitaireGame() as this =
     inherit Game()
 
-    let mutable model = model
-    let initialCmd = initialCmd
     let manager = new GraphicsDeviceManager(this)
+    let model,initialCmd = initModel(new System.Random())
+
+    [<DefaultValue>] val mutable model : Model
 
     [<DefaultValue>] val mutable background : Graphics.Texture2D
+    [<DefaultValue>] val mutable cardBack : Graphics.Texture2D
+    [<DefaultValue>] val mutable keySignature : Graphics.Texture2D
+    [<DefaultValue>] val mutable doe : Graphics.Texture2D
+    [<DefaultValue>] val mutable re : Graphics.Texture2D
+    [<DefaultValue>] val mutable mi : Graphics.Texture2D
+    [<DefaultValue>] val mutable fa : Graphics.Texture2D
+    [<DefaultValue>] val mutable so : Graphics.Texture2D
+    [<DefaultValue>] val mutable la : Graphics.Texture2D
+    [<DefaultValue>] val mutable ti : Graphics.Texture2D
+    [<DefaultValue>] val mutable do8 : Graphics.Texture2D
+    [<DefaultValue>] val mutable iv : Graphics.Texture2D
+    [<DefaultValue>] val mutable v : Graphics.Texture2D
+    [<DefaultValue>] val mutable i : Graphics.Texture2D
+    [<DefaultValue>] val mutable hearts : Graphics.Texture2D
+    [<DefaultValue>] val mutable spades : Graphics.Texture2D
+    [<DefaultValue>] val mutable diamonds : Graphics.Texture2D
+    [<DefaultValue>] val mutable clubs : Graphics.Texture2D
     [<DefaultValue>] val mutable spriteBatch : Graphics.SpriteBatch
 
     let rec runCmd cmd = 
@@ -566,17 +584,91 @@ type MusicSolitaireGame(model : Model, initialCmd : Cmd<Msg>) as this =
 
     override __.Initialize() = 
         this.spriteBatch <- new Graphics.SpriteBatch(this.GraphicsDevice)
-        model <- execCmd initialCmd model
+        this.model <- execCmd initialCmd model
         base.Initialize()
         
 
     override __.LoadContent() =
         this.Content.RootDirectory <- "Content"
         this.background <- this.Content.Load<Graphics.Texture2D>("Table")
+        this.cardBack <- this.Content.Load<Graphics.Texture2D>("CardBack")
+        this.keySignature <- this.Content.Load<Graphics.Texture2D>("Ks")
+        this.doe <- this.Content.Load<Graphics.Texture2D>("Do")
+        this.re <- this.Content.Load<Graphics.Texture2D>("Re")
+        this.mi <- this.Content.Load<Graphics.Texture2D>("Mi")
+        this.fa <- this.Content.Load<Graphics.Texture2D>("Fa")
+        this.so <- this.Content.Load<Graphics.Texture2D>("So")
+        this.la <- this.Content.Load<Graphics.Texture2D>("La")
+        this.ti <- this.Content.Load<Graphics.Texture2D>("Ti")
+        this.do8 <- this.Content.Load<Graphics.Texture2D>("Do8")
+        this.iv <- this.Content.Load<Graphics.Texture2D>("IV")
+        this.v <- this.Content.Load<Graphics.Texture2D>("V")
+        this.i <- this.Content.Load<Graphics.Texture2D>("I")
+        this.hearts <- this.Content.Load<Graphics.Texture2D>("Hearts")
+        this.spades <- this.Content.Load<Graphics.Texture2D>("Spades")
+        this.diamonds <- this.Content.Load<Graphics.Texture2D>("Diamonds")
+        this.clubs <- this.Content.Load<Graphics.Texture2D>("Clubs")
         base.LoadContent()
+
+    member __.DrawStock() =
+        match this.model.stock with
+        | [] -> ()
+        | _ -> this.spriteBatch.Draw(this.cardBack, new Vector2(638.0f,26.0f), Color.White)
+
+    member __.DrawDown(x, y, down) =
+        match down with
+        | [] -> y
+        | card :: cards ->
+            let y = this.DrawDown(x, y, cards)
+            this.spriteBatch.Draw(this.cardBack, new Vector2(x,y), Color.White)
+            y + 32.0f
+
+    member __.DrawCard(card, x, y) =
+        match card with
+        | _,KeySignature -> this.spriteBatch.Draw(this.keySignature, new Vector2(x,y), Color.White)
+        | _,Do -> this.spriteBatch.Draw(this.doe, new Vector2(x,y), Color.White)
+        | _,Re -> this.spriteBatch.Draw(this.re, new Vector2(x,y), Color.White)
+        | _,Mi -> this.spriteBatch.Draw(this.mi, new Vector2(x,y), Color.White)
+        | _,Fa -> this.spriteBatch.Draw(this.fa, new Vector2(x,y), Color.White)
+        | _,So -> this.spriteBatch.Draw(this.so, new Vector2(x,y), Color.White)
+        | _,La -> this.spriteBatch.Draw(this.la, new Vector2(x,y), Color.White)
+        | _,Ti -> this.spriteBatch.Draw(this.ti, new Vector2(x,y), Color.White)
+        | _,Do8 -> this.spriteBatch.Draw(this.do8, new Vector2(x,y), Color.White)
+        | _,IV -> this.spriteBatch.Draw(this.iv, new Vector2(x,y), Color.White)
+        | _,V -> this.spriteBatch.Draw(this.v, new Vector2(x,y), Color.White)
+        | _,I -> this.spriteBatch.Draw(this.i, new Vector2(x,y), Color.White)
+
+        match card with
+        | Hearts,_ -> this.spriteBatch.Draw(this.hearts, new Vector2(x,y), Color.White)
+        | Spades,_ -> this.spriteBatch.Draw(this.spades, new Vector2(x,y), Color.White)
+        | Diamonds,_ -> this.spriteBatch.Draw(this.diamonds, new Vector2(x,y), Color.White)
+        | Clubs,_ -> this.spriteBatch.Draw(this.clubs, new Vector2(x,y), Color.White)
+
+    member __.DrawUp(x, y, up) =
+        match List.rev up with
+        | [] -> ()
+        | card :: cards ->
+            this.DrawCard(card, x, y)
+            this.DrawUp(x, y + 32.0f, cards)
+
+    member __.DrawTableau(num, down, up) =
+        let x = 26.0f + ((float32 num) * 102.0f)
+        let y = this.DrawDown(x, 193.0f, down)
+        this.DrawUp(x, y, up)
+
+    member __.DrawTableaus() =
+        this.DrawTableau(0, [], this.model.tableau1)
+        match this.model.tableau2 with up,down -> this.DrawTableau(1, down, up)
+        match this.model.tableau3 with up,down -> this.DrawTableau(2, down, up)
+        match this.model.tableau4 with up,down -> this.DrawTableau(3, down, up)
+        match this.model.tableau5 with up,down -> this.DrawTableau(4, down, up)
+        match this.model.tableau6 with up,down -> this.DrawTableau(5, down, up)
+        match this.model.tableau7 with up,down -> this.DrawTableau(6, down, up)
 
     override __.Draw gameTime = 
         this.spriteBatch.Begin()
         this.spriteBatch.Draw(this.background, new Vector2(), Color.White)
+        this.DrawStock()
+        this.DrawTableaus()
         this.spriteBatch.End()
         base.Draw(gameTime)
