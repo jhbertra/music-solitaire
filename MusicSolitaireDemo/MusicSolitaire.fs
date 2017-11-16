@@ -465,7 +465,7 @@ let update msg model =
                     moving = None
                     }
                     ,(Msg MoveCommitted)
-            | [card],ClubsFoundation when canPlaceOnFoundation model.heartsFoundation Clubs card ->
+            | [card],ClubsFoundation when canPlaceOnFoundation model.clubsFoundation Clubs card ->
                 { model with
                     clubsFoundation = card :: model.clubsFoundation
                     moving = None
@@ -525,8 +525,8 @@ let update msg model =
         else 
             { model with
                 tableau2 = replenish model.tableau2
-                tableau4 = replenish model.tableau3
-                tableau3 = replenish model.tableau4
+                tableau3 = replenish model.tableau3
+                tableau4 = replenish model.tableau4
                 tableau5 = replenish model.tableau5
                 tableau6 = replenish model.tableau6
                 tableau7 = replenish model.tableau7
@@ -652,6 +652,14 @@ type MusicSolitaireGame() as this =
 
     let getMoveBeginData (gesture : GestureSample) =
         match gesture.Position.X, gesture.Position.Y with
+        | x,y when x >= 26.0f && x < 102.0f && y >= 26.0f && y < 141.0f ->
+            Some (HeartsFoundation, 1, (26.0f, 26.0f))
+        | x,y when x >= 120.0f && x < 206.0f && y >= 26.0f && y < 141.0f ->
+            Some (SpadesFoundation, 1, (120.0f, 26.0f))
+        | x,y when x >= 222.0f && x < 308.0f && y >= 26.0f && y < 141.0f ->
+            Some (DiamondsFoundation, 1, (222.0f, 26.0f))
+        | x,y when x >= 324.0f && x < 410.0f && y >= 26.0f && y < 141.0f ->
+            Some (ClubsFoundation, 1, (324.0f, 26.0f))
         | x,y when x >= 536.0f && x < 622.0f && y >= 26.0f && y < 141.0f ->
             Some (Talon, 1, (536.0f, 26.0f))
         | x,y when isInTableau (this.model.tableau1,[]) 26.0f x y ->
@@ -669,6 +677,29 @@ type MusicSolitaireGame() as this =
         | x,y when isInTableau this.model.tableau7 638.0f x y ->
             match getTablueaMoveBeginData this.model.tableau7 638.0f x y with count,pos -> Some (Tableau7, count, pos)
         | _ -> 
+            None
+
+    let getTarget x y =
+        if y >= 26.0f && y < 46.0f
+        then
+            if x >= 26.0f && x < 46.0f
+            then
+                Some HeartsFoundation
+            else if x >= 118.0f && x < 138.0f
+            then
+                Some SpadesFoundation
+            else if x >= 220.0f && x < 240.0f
+            then
+                Some DiamondsFoundation
+            else if x >= 322.0f && x < 342.0f
+            then
+                Some ClubsFoundation
+            else
+                None
+        else if y >= 193.0f
+        then
+            None
+        else
             None
 
     override __.Update(gameTime) =
@@ -689,7 +720,12 @@ type MusicSolitaireGame() as this =
                     this.model <- execCmd (Msg (SetMovingPosition pos)) this.model
             else if gesture.GestureType = GestureType.DragComplete
             then
-                this.model <- execCmd (Msg CancelMove) this.model
+                match this.model.moving with
+                | None -> ()
+                | Some (_,_,(x,y)) ->
+                    match getTarget x y with
+                    | None -> this.model <- execCmd (Msg CancelMove) this.model
+                    | Some target -> this.model <- execCmd (Msg (CommitMove target)) this.model
             else
                 ()
         base.Update(gameTime)
@@ -758,6 +794,18 @@ type MusicSolitaireGame() as this =
         match this.model.tableau6 with up,down -> this.DrawTableau(5, down, up)
         match this.model.tableau7 with up,down -> this.DrawTableau(6, down, up)
 
+    member __.DrawFoundation(num, cards) =
+        match cards with 
+        | card :: cards -> this.DrawCard(card, 26.0f + ((float32 num) * 102.0f), 26.0f)
+        | [] -> ()
+
+
+    member __.DrawFoundations() =
+        this.DrawFoundation(0, this.model.heartsFoundation)
+        this.DrawFoundation(1, this.model.spadesFoundation)
+        this.DrawFoundation(2, this.model.diamondsFoundation)
+        this.DrawFoundation(3, this.model.clubsFoundation)
+
     member __.DrawMoving() =
         match this.model.moving with
         | None -> ()
@@ -771,5 +819,6 @@ type MusicSolitaireGame() as this =
         this.DrawTableaus()
         this.DrawTalon()
         this.DrawMoving()
+        this.DrawFoundations()
         this.spriteBatch.End()
         base.Draw(gameTime)
