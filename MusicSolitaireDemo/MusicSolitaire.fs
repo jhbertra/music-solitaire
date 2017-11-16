@@ -546,6 +546,8 @@ type MusicSolitaireGame(model : Model, initialCmd : Cmd<Msg>) as this =
     let initialCmd = initialCmd
     let manager = new GraphicsDeviceManager(this)
 
+    [<DefaultValue>] val mutable background : Graphics.Texture2D
+    [<DefaultValue>] val mutable spriteBatch : Graphics.SpriteBatch
 
     let rec runCmd cmd = 
         state {
@@ -563,8 +565,18 @@ type MusicSolitaireGame(model : Model, initialCmd : Cmd<Msg>) as this =
         execState gameStateBuilder model
 
     override __.Initialize() = 
+        this.spriteBatch <- new Graphics.SpriteBatch(this.GraphicsDevice)
         model <- execCmd initialCmd model
+        base.Initialize()
+        
 
-    override __.Draw _ = 
-        printfn "%A" model
-        this.GraphicsDevice.Clear Color.CornflowerBlue
+    override __.LoadContent() =
+        this.Content.RootDirectory <- "Content"
+        this.background <- this.Content.Load<Graphics.Texture2D>("Table")
+        base.LoadContent()
+
+    override __.Draw gameTime = 
+        this.spriteBatch.Begin()
+        this.spriteBatch.Draw(this.background, new Vector2(), Color.White)
+        this.spriteBatch.End()
+        base.Draw(gameTime)
