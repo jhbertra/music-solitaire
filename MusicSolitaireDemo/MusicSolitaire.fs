@@ -128,7 +128,7 @@ type Phase =
     | PlayingPhase
     | WonPhase
 
-type MovingModel = Pile * Card list
+type MovingModel = Pile * Card list * (float32 * float32)
 
 type Model = {
     phase : Phase
@@ -158,7 +158,8 @@ type Model = {
 type Msg =
     | DealCards
     | PopStock
-    | BeginMove of Pile * int
+    | BeginMove of Pile * int * (float32 * float32)
+    | SetMovingPosition of float32 * float32
     | CancelMove
     | CommitMove of Pile
     | MoveCommitted
@@ -281,151 +282,159 @@ let update msg model =
             }
             ,Term
 
-    | PlayingPhase,(BeginMove (origin, count)) ->
+    | PlayingPhase,(BeginMove (origin, count, pos)) ->
         match model.moving,origin,count with
         | None,Talon,1 when List.length model.talon > 0 ->
             { model with
                 talon = List.skip 1 model.talon
-                moving = Some (origin,(List.take 1 model.talon))
+                moving = Some (origin,(List.take 1 model.talon),pos)
                 }
                 ,Term
         | None,HeartsFoundation,1 when List.length model.heartsFoundation > 0 ->
             { model with
                 heartsFoundation = List.skip 1 model.heartsFoundation
-                moving = Some (origin,(List.take 1 model.heartsFoundation))
+                moving = Some (origin,(List.take 1 model.heartsFoundation),pos)
                 }
                 ,Term
         | None,SpadesFoundation,1 when List.length model.spadesFoundation > 0 ->
             { model with
                 spadesFoundation = List.skip 1 model.spadesFoundation
-                moving = Some (origin,(List.take 1 model.spadesFoundation))
+                moving = Some (origin,(List.take 1 model.spadesFoundation),pos)
                 }
                 ,Term
         | None,DiamondsFoundation,1 when List.length model.diamondsFoundation > 0 ->
             { model with
                 diamondsFoundation = List.skip 1 model.diamondsFoundation
-                moving = Some (origin,(List.take 1 model.diamondsFoundation))
+                moving = Some (origin,(List.take 1 model.diamondsFoundation),pos)
                 }
                 ,Term
         | None,ClubsFoundation,1 when List.length model.clubsFoundation > 0 ->
             { model with
                 clubsFoundation = List.skip 1 model.clubsFoundation
-                moving = Some (origin,(List.take 1 model.clubsFoundation))
+                moving = Some (origin,(List.take 1 model.clubsFoundation),pos)
                 }
                 ,Term
         | None,Tableau1,n when n <= List.length model.tableau1 && n > 0 ->
             { model with
                 tableau1 = List.skip n model.tableau1
-                moving = Some (origin,(List.take n model.tableau1))
+                moving = Some (origin,(List.take n model.tableau1),pos)
                 }
                 ,Term
         | None,Tableau2,n when n <= List.length (fst model.tableau2) && n > 0 ->
             { model with
                 tableau2 = (List.skip n (fst model.tableau2)),(snd model.tableau2)
-                moving = Some (origin,(List.take n (fst model.tableau2)))
+                moving = Some (origin,(List.take n (fst model.tableau2)),pos)
                 }
                 ,Term
         | None,Tableau3,n when n <= List.length (fst model.tableau3) && n > 0 ->
             { model with
                 tableau3 = (List.skip n (fst model.tableau3)),(snd model.tableau3)
-                moving = Some (origin,(List.take n (fst model.tableau3)))
+                moving = Some (origin,(List.take n (fst model.tableau3)),pos)
                 }
                 ,Term
         | None,Tableau4,n when n <= List.length (fst model.tableau4) && n > 0 ->
             { model with
                 tableau4 = (List.skip n (fst model.tableau4)),(snd model.tableau4)
-                moving = Some (origin,(List.take n (fst model.tableau4)))
+                moving = Some (origin,(List.take n (fst model.tableau4)),pos)
                 }
                 ,Term
         | None,Tableau5,n when n <= List.length (fst model.tableau5) && n > 0 ->
             { model with
                 tableau5 = (List.skip n (fst model.tableau5)),(snd model.tableau5)
-                moving = Some (origin,(List.take n (fst model.tableau5)))
+                moving = Some (origin,(List.take n (fst model.tableau5)),pos)
                 }
                 ,Term
         | None,Tableau6,n when n <= List.length (fst model.tableau6) && n > 0 ->
             { model with
                 tableau6 = (List.skip n (fst model.tableau6)),(snd model.tableau6)
-                moving = Some (origin,(List.take n (fst model.tableau6)))
+                moving = Some (origin,(List.take n (fst model.tableau6)),pos)
                 }
                 ,Term
         | None,Tableau7,n when n <= List.length (fst model.tableau7) && n > 0 ->
             { model with
                 tableau7 = (List.skip n (fst model.tableau7)),(snd model.tableau7)
-                moving = Some (origin,(List.take n (fst model.tableau7)))
+                moving = Some (origin,(List.take n (fst model.tableau7)),pos)
                 }
                 ,Term
         | _ -> model,Term
 
+    | PlayingPhase,(SetMovingPosition (x,y)) ->
+        match model.moving with
+        | None -> model,Term
+        | Some (pile,cards,_) ->
+            { model with
+                moving = Some (pile,cards,(x,y))
+                }
+                ,Term
     | PlayingPhase,CancelMove ->
         match model.moving with
-        | Some (Talon,cards) -> 
+        | Some (Talon,cards,_) -> 
             { model with
                 talon = cards @ model.talon
                 moving = None
                 }
                 ,Term
-        | Some (HeartsFoundation,cards) -> 
+        | Some (HeartsFoundation,cards,_) -> 
             { model with
                 heartsFoundation = cards @ model.heartsFoundation
                 moving = None
                 }
                 ,Term
-        | Some (SpadesFoundation,cards) -> 
+        | Some (SpadesFoundation,cards,_) -> 
             { model with
                 spadesFoundation = cards @ model.spadesFoundation
                 moving = None
                 }
                 ,Term
-        | Some (DiamondsFoundation,cards) -> 
+        | Some (DiamondsFoundation,cards,_) -> 
             { model with
                 diamondsFoundation = cards @ model.diamondsFoundation
                 moving = None
                 }
                 ,Term
-        | Some (ClubsFoundation,cards) -> 
+        | Some (ClubsFoundation,cards,_) -> 
             { model with
                 clubsFoundation = cards @ model.clubsFoundation
                 moving = None
                 }
                 ,Term
-        | Some (Tableau1,cards) -> 
+        | Some (Tableau1,cards,_) -> 
             { model with
                 tableau1 = cards @ model.tableau1
                 moving = None
                 }
                 ,Term
-        | Some (Tableau2,cards) -> 
+        | Some (Tableau2,cards,_) -> 
             { model with
                 tableau2 = (cards @ (fst model.tableau2),(snd model.tableau2))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau3,cards) -> 
+        | Some (Tableau3,cards,_) -> 
             { model with
                 tableau3 = (cards @ (fst model.tableau3),(snd model.tableau3))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau4,cards) -> 
+        | Some (Tableau4,cards,_) -> 
             { model with
                 tableau4 = (cards @ (fst model.tableau4),(snd model.tableau4))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau5,cards) -> 
+        | Some (Tableau5,cards,_) -> 
             { model with
                 tableau5 = (cards @ (fst model.tableau5),(snd model.tableau5))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau6,cards) -> 
+        | Some (Tableau6,cards,_) -> 
             { model with
                 tableau6 = (cards @ (fst model.tableau6),(snd model.tableau6))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau7,cards) -> 
+        | Some (Tableau7,cards,_) -> 
             { model with
                 tableau7 = (cards @ (fst model.tableau7),(snd model.tableau7))
                 moving = None
@@ -436,7 +445,7 @@ let update msg model =
     | PlayingPhase,(CommitMove target) ->
         match model.moving with
         | None -> model,Term
-        | Some (_,cards) ->
+        | Some (_,cards,_) ->
             match cards,target with
             | [card],HeartsFoundation when canPlaceOnFoundation model.heartsFoundation Hearts card ->
                 { model with
@@ -589,7 +598,7 @@ type MusicSolitaireGame() as this =
     override __.Initialize() = 
         this.spriteBatch <- new Graphics.SpriteBatch(this.GraphicsDevice)
         this.model <- execCmd initialCmd model
-        TouchPanel.EnabledGestures <- GestureType.Tap
+        TouchPanel.EnabledGestures <- GestureType.Tap ||| GestureType.FreeDrag ||| GestureType.DragComplete
         base.Initialize()
 
     //
@@ -627,12 +636,32 @@ type MusicSolitaireGame() as this =
         tapPos.X >= 638.0f && tapPos.X < 724.0f
         && tapPos.Y >= 26.0f && tapPos.Y < 141.0f
 
+    let getMoveBeginData (gesture : GestureSample) =
+        match gesture.Position.X, gesture.Position.Y with
+        | x,y when x >= 536.0f && x < 622.0f && y >= 26.0f && y < 141.0f ->
+            Some (Talon, 1, (536.0f, 26.0f))
+        | _ -> 
+            None
+
     override __.Update(gameTime) =
         while TouchPanel.IsGestureAvailable do
             let gesture = TouchPanel.ReadGesture()
             if gesture.GestureType = GestureType.Tap && isInStock gesture.Position
             then
                 this.model <- execCmd (Msg PopStock) this.model
+            else if gesture.GestureType = GestureType.FreeDrag
+            then
+                match this.model.moving with
+                | None -> 
+                    match getMoveBeginData gesture with
+                    | None -> ()
+                    | Some data -> this.model <- execCmd (Msg (BeginMove data)) this.model
+                | Some (_,_,pos) ->
+                    let pos = match pos with x,y -> (x + gesture.Delta.X),(y + gesture.Delta.Y)
+                    this.model <- execCmd (Msg (SetMovingPosition pos)) this.model
+            else if gesture.GestureType = GestureType.DragComplete
+            then
+                this.model <- execCmd (Msg CancelMove) this.model
             else
                 ()
         base.Update(gameTime)
@@ -701,11 +730,18 @@ type MusicSolitaireGame() as this =
         match this.model.tableau6 with up,down -> this.DrawTableau(5, down, up)
         match this.model.tableau7 with up,down -> this.DrawTableau(6, down, up)
 
+    member __.DrawMoving() =
+        match this.model.moving with
+        | None -> ()
+        | Some (_,cards,(x,y)) ->
+            this.DrawUp(x, y, cards)
+
     override __.Draw gameTime = 
         this.spriteBatch.Begin()
         this.spriteBatch.Draw(this.background, new Vector2(), Color.White)
         this.DrawStock()
         this.DrawTableaus()
         this.DrawTalon()
+        this.DrawMoving()
         this.spriteBatch.End()
         base.Draw(gameTime)
