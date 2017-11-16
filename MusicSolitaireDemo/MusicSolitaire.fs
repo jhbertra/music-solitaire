@@ -9,8 +9,7 @@
 
 type State<'s,'v> = State of ('s -> 'v * 's)
 
-let runState state initial =
-    match state with State f -> f initial
+let runState state initial = match state with State f -> f initial
 
 type StateBuilder() =
 
@@ -43,13 +42,9 @@ let gets f =
         return f x
     }
 
-let evalState state initial =
-    runState state initial
-    |> fst
+let evalState state initial = runState state initial |> fst
 
-let execState state initial =
-    runState state initial
-    |> snd
+let execState state initial = runState state initial |> snd
 
 
 
@@ -157,10 +152,26 @@ type Model = {
 
 
 //
+// --------- Msg ---------
+//
+
+type Msg =
+    | DealCards
+    | PopStock
+    | BeginMove of Pile * int
+    | CancelMove
+    | CommitMove of Pile
+    | MoveCommitted
+    | Reset
+
+
+
+//
 // --------- Init ---------
 //
 
-let initModel rng = {
+let initModel rng = 
+    {
     stock = []
     talon = []
     tableau1 = []
@@ -176,7 +187,8 @@ let initModel rng = {
     clubsFoundation = []
     moving = None
     rng = rng
-    phase = DealPhase {
+    phase = DealPhase 
+        {
         deck = 
             [for suit in suits do for face in faces do yield suit,face]
             |> Array.ofList
@@ -187,21 +199,7 @@ let initModel rng = {
             numberOrder |> List.collect (fun i -> (List.skip (i-1) numberOrder) |> List.mapi (fun j num -> num,j=0))
         }
     }
-
-
-
-//
-// --------- Msg ---------
-//
-
-type Msg =
-    | DealCards
-    | PopStock
-    | BeginMove of Pile * int
-    | CancelMove
-    | CommitMove of Pile
-    | Win
-    | Reset
+    ,(Msg DealCards)
 
 
 
@@ -212,22 +210,41 @@ type Msg =
 let updateTableau tableau faceUp card =
     match tableau with up,down -> if faceUp then card::up,down else up,card::down
 
+let isFace2Higher face1 face2 =
+    face1 = KeySignature && face2 = Do
+    || face1 = Do && face2 = Re
+    || face1 = Re && face2 = Me
+    || face1 = Me && face2 = Fa
+    || face1 = Fa && face2 = So
+    || face1 = So && face2 = La
+    || face1 = La && face2 = Te
+    || face1 = Te && face2 = Do8
+    || face1 = Do8 && face2 = IV
+    || face1 = IV && face2 = V
+    || face1 = V && face2 = I
+
+let areAlternateSuits suit1 suit2 =
+    match suit1 with
+    | Hearts | Diamonds -> suit2 = Clubs || suit2 = Spades
+    | _ -> suit2 = Hearts || suit2 = Diamonds
+
 let canPlaceOnFoundation foundation requiredSuit card =
     match foundation,card with
-    | [],(suit,face) when face = KeySignature -> true
-    | [_,KeySignature],(suit,face) when face = Do -> true
-    | (_,Do) :: tail,(suit,face) when face = Re -> true
-    | (_,Re) :: tail,(suit,face) when face = Me -> true
-    | (_,Me) :: tail,(suit,face) when face = Fa -> true
-    | (_,Fa) :: tail,(suit,face) when face = So -> true
-    | (_,So) :: tail,(suit,face) when face = La -> true
-    | (_,La) :: tail,(suit,face) when face = Te -> true
-    | (_,Te) :: tail,(suit,face) when face = Do8 -> true
-    | (_,Do8) :: tail,(suit,face) when face = IV -> true
-    | (_,IV) :: tail,(suit,face) when face = V -> true
-    | (_,V) :: tail,(suit,face) when face = I -> true
+    | [],(suit,KeySignature) -> suit = requiredSuit
+    | [_,targetFace],(suit,face) -> isFace2Higher targetFace face && suit = requiredSuit
     | _ -> false
-    && (fst card) = requiredSuit
+
+let canPlaceOnTableau tableau cards =
+    match tableau,(List.rev cards) with
+    | [],((_,I) :: _) -> true
+    | ((targetSuit, targetFace) :: _),((suit,face) :: _) -> 
+        isFace2Higher face targetFace && areAlternateSuits targetSuit suit 
+    | _ -> false
+
+let replenish destAndSource =
+    match destAndSource with
+    | [],(head :: tail) -> [head],tail
+    | _ -> destAndSource
 
 let update msg model =
     match model.phase,msg with
@@ -251,8 +268,6 @@ let update msg model =
                 | _ -> model
             | [] -> { model with stock = card :: model.stock; phase = DealPhase { deck = remainingDeck; tableauDealMoves = [] } }
             ,Msg DealCards
-
-
 
     // Playing
 
@@ -428,42 +443,90 @@ let update msg model =
                     heartsFoundation = card :: model.heartsFoundation
                     moving = None
                     }
-                    ,(Msg Win)
+                    ,(Msg MoveCommitted)
             | [card],SpadesFoundation when canPlaceOnFoundation model.spadesFoundation Spades card ->
                 { model with
                     spadesFoundation = card :: model.spadesFoundation
                     moving = None
                     }
-                    ,(Msg Win)
+                    ,(Msg MoveCommitted)
             | [card],DiamondsFoundation when canPlaceOnFoundation model.heartsFoundation Diamonds card ->
                 { model with
                     diamondsFoundation = card :: model.diamondsFoundation
                     moving = None
                     }
-                    ,(Msg Win)
+                    ,(Msg MoveCommitted)
             | [card],ClubsFoundation when canPlaceOnFoundation model.heartsFoundation Clubs card ->
                 { model with
                     clubsFoundation = card :: model.clubsFoundation
                     moving = None
                     }
-                    ,(Msg Win)
+                    ,(Msg MoveCommitted)
+            | cards,Tableau1 when canPlaceOnTableau model.tableau1 cards ->
+                { model with
+                    tableau1 = cards @ model.tableau1
+                    moving = None
+                    }
+                    ,(Msg MoveCommitted)
+            | cards,Tableau2 when canPlaceOnTableau (fst model.tableau2) cards ->
+                { model with
+                    tableau2 = (cards @ (fst model.tableau2)),(snd model.tableau2)
+                    moving = None
+                    }
+                    ,(Msg MoveCommitted)
+            | cards,Tableau3 when canPlaceOnTableau (fst model.tableau3) cards ->
+                { model with
+                    tableau3 = (cards @ (fst model.tableau3)),(snd model.tableau3)
+                    moving = None
+                    }
+                    ,(Msg MoveCommitted)
+            | cards,Tableau4 when canPlaceOnTableau (fst model.tableau4) cards ->
+                { model with
+                    tableau4 = (cards @ (fst model.tableau4)),(snd model.tableau4)
+                    moving = None
+                    }
+                    ,(Msg MoveCommitted)
+            | cards,Tableau5 when canPlaceOnTableau (fst model.tableau5) cards ->
+                { model with
+                    tableau5 = (cards @ (fst model.tableau5)),(snd model.tableau5)
+                    moving = None
+                    }
+                    ,(Msg MoveCommitted)
+            | cards,Tableau6 when canPlaceOnTableau (fst model.tableau6) cards ->
+                { model with
+                    tableau6 = (cards @ (fst model.tableau6)),(snd model.tableau6)
+                    moving = None
+                    }
+                    ,(Msg MoveCommitted)
+            | cards,Tableau7 when canPlaceOnTableau (fst model.tableau7) cards ->
+                { model with
+                    tableau7 = (cards @ (fst model.tableau7)),(snd model.tableau7)
+                    moving = None
+                    }
+                    ,(Msg MoveCommitted)
             | _ -> model,(Msg CancelMove)
-            // todo pick up here
 
-    | PlayingPhase,Win ->
+    | PlayingPhase,MoveCommitted ->
         if [model.heartsFoundation;model.spadesFoundation;model.diamondsFoundation;model.clubsFoundation] |> List.map List.length = [12;12;12;12]
         then
             { model with
                 phase = WonPhase
                 }
                 ,Term
-        else model,Term
+        else 
+            { model with
+                tableau2 = replenish model.tableau2
+                tableau4 = replenish model.tableau3
+                tableau3 = replenish model.tableau4
+                tableau5 = replenish model.tableau5
+                tableau6 = replenish model.tableau6
+                tableau7 = replenish model.tableau7
+                }
+                ,Term
 
-    | _,Reset -> (initModel model.rng),Msg DealCards
+    | _,Reset -> initModel model.rng
 
     | _ -> model,Term
-
-
 
 
 
@@ -474,34 +537,34 @@ let update msg model =
 //                PLATFORM                   //
 // ***************************************** //
 
-//
-// --------- Cmd --------
-//
-
-let rec runCmd cmd = 
-    state {
-        let! model = getState
-        match cmd with
-        | Term -> return model
-        | Msg msg -> 
-            let newModel,nextCmd = update msg model
-            do! putState newModel
-            return! runCmd nextCmd
-        }
-
-let execGameState cmd model =
-    let gameStateBuilder = runCmd cmd
-    execState gameStateBuilder model
-
-
-
-//
-// --------- Game --------
-//
-
 open Microsoft.Xna.Framework
 
-type MusicSolitaireGame() as game =
-    inherit Game() 
-    let manager = new GraphicsDeviceManager(game)
-    override __.Draw _ = game.GraphicsDevice.Clear Color.CornflowerBlue
+type MusicSolitaireGame(model : Model, initialCmd : Cmd<Msg>) as this =
+    inherit Game()
+
+    let mutable model = model
+    let initialCmd = initialCmd
+    let manager = new GraphicsDeviceManager(this)
+
+
+    let rec runCmd cmd = 
+        state {
+            let! model = getState
+            match cmd with
+            | Term -> return model
+            | Msg msg -> 
+                let newModel,nextCmd = update msg model
+                do! putState newModel
+                return! runCmd nextCmd
+            }
+
+    let execCmd cmd model =
+        let gameStateBuilder = runCmd cmd
+        execState gameStateBuilder model
+
+    override __.Initialize() = 
+        model <- execCmd initialCmd model
+
+    override __.Draw _ = 
+        printfn "%A" model
+        this.GraphicsDevice.Clear Color.CornflowerBlue
