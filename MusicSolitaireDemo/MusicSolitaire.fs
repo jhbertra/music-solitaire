@@ -538,6 +538,7 @@ let update msg model =
 // ***************************************** //
 
 open Microsoft.Xna.Framework
+open Microsoft.Xna.Framework.Input.Touch
 
 type MusicSolitaireGame() as this =
     inherit Game()
@@ -581,11 +582,19 @@ type MusicSolitaireGame() as this =
     let execCmd cmd model =
         let gameStateBuilder = runCmd cmd
         execState gameStateBuilder model
+    //
+    // --------- Initialize ---------
+    //
 
     override __.Initialize() = 
         this.spriteBatch <- new Graphics.SpriteBatch(this.GraphicsDevice)
         this.model <- execCmd initialCmd model
+        TouchPanel.EnabledGestures <- GestureType.Tap
         base.Initialize()
+
+    //
+    // --------- Load ---------
+    //
         
 
     override __.LoadContent() =
@@ -610,10 +619,37 @@ type MusicSolitaireGame() as this =
         this.clubs <- this.Content.Load<Graphics.Texture2D>("Clubs")
         base.LoadContent()
 
+    //
+    // --------- Update ---------
+    //
+
+    let isInStock (tapPos : Vector2) =
+        tapPos.X >= 638.0f && tapPos.X < 724.0f
+        && tapPos.Y >= 26.0f && tapPos.Y < 141.0f
+
+    override __.Update(gameTime) =
+        while TouchPanel.IsGestureAvailable do
+            let gesture = TouchPanel.ReadGesture()
+            if gesture.GestureType = GestureType.Tap && isInStock gesture.Position
+            then
+                this.model <- execCmd (Msg PopStock) this.model
+            else
+                ()
+        base.Update(gameTime)
+
+    //
+    // --------- Draw ---------
+    //
+
     member __.DrawStock() =
         match this.model.stock with
         | [] -> ()
         | _ -> this.spriteBatch.Draw(this.cardBack, new Vector2(638.0f,26.0f), Color.White)
+
+    member __.DrawTalon() =
+        match this.model.talon with
+        | [] -> ()
+        | card::_ -> this.DrawCard(card, 536.0f, 26.0f)
 
     member __.DrawDown(x, y, down) =
         match down with
@@ -670,5 +706,6 @@ type MusicSolitaireGame() as this =
         this.spriteBatch.Draw(this.background, new Vector2(), Color.White)
         this.DrawStock()
         this.DrawTableaus()
+        this.DrawTalon()
         this.spriteBatch.End()
         base.Draw(gameTime)
