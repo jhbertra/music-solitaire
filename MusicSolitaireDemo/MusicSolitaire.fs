@@ -636,10 +636,38 @@ type MusicSolitaireGame() as this =
         tapPos.X >= 638.0f && tapPos.X < 724.0f
         && tapPos.Y >= 26.0f && tapPos.Y < 141.0f
 
+    let isInTableau tableau xOffset x y =
+        match tableau with 
+        | up,down ->
+            let yOffset = 193.0f + (float32)(List.length down) * 32.0f
+            x >= xOffset && x < xOffset + 86.0f && y >= yOffset && y < yOffset + (float32)((List.length up) - 1) * 32.0f + 115.0f
+
+    let getTablueaMoveBeginData tableau xOffset x y =
+        match tableau with 
+        | up,down ->
+            let yOffset = 193.0f + (float32)(List.length down) * 32.0f
+            let upCount = List.length up
+            let cardsMoved = System.Math.Max(1, upCount - (int)((y - yOffset) / 32.0f))
+            cardsMoved,(xOffset,yOffset + (float32)(upCount - cardsMoved) * 32.0f)
+
     let getMoveBeginData (gesture : GestureSample) =
         match gesture.Position.X, gesture.Position.Y with
         | x,y when x >= 536.0f && x < 622.0f && y >= 26.0f && y < 141.0f ->
             Some (Talon, 1, (536.0f, 26.0f))
+        | x,y when isInTableau (this.model.tableau1,[]) 26.0f x y ->
+            match getTablueaMoveBeginData (this.model.tableau1,[]) 26.0f x y with count,pos -> Some (Tableau1, count, pos)
+        | x,y when isInTableau this.model.tableau2 128.0f x y ->
+            match getTablueaMoveBeginData this.model.tableau2 128.0f x y with count,pos -> Some (Tableau2, count, pos)
+        | x,y when isInTableau this.model.tableau3 230.0f x y ->
+            match getTablueaMoveBeginData this.model.tableau3 230.0f x y with count,pos -> Some (Tableau3, count, pos)
+        | x,y when isInTableau this.model.tableau4 332.0f x y ->
+            match getTablueaMoveBeginData this.model.tableau4 332.0f x y with count,pos -> Some (Tableau4, count, pos)
+        | x,y when isInTableau this.model.tableau5 434.0f x y ->
+            match getTablueaMoveBeginData this.model.tableau5 434.0f x y with count,pos -> Some (Tableau5, count, pos)
+        | x,y when isInTableau this.model.tableau6 536.0f x y ->
+            match getTablueaMoveBeginData this.model.tableau6 536.0f x y with count,pos -> Some (Tableau6, count, pos)
+        | x,y when isInTableau this.model.tableau7 638.0f x y ->
+            match getTablueaMoveBeginData this.model.tableau7 638.0f x y with count,pos -> Some (Tableau7, count, pos)
         | _ -> 
             None
 
