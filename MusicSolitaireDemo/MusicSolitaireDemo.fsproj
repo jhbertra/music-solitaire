@@ -92,60 +92,58 @@
     <Folder Include="Content\" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Content\CardBack.xnb" />
+    <None Include="Content\La.xnb" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Content\Fa.xnb" />
+    <Content Include="Content\V.xnb" />
+    <None Include="Content\CardBack.xnb" />
+    <None Include="Content\Diamonds.xnb" />
+    <None Include="Content\Hearts.xnb" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Content\Do.xnb" />
-    <Content Include="Content\Fa.xnb" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Content\Mi.xnb" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Content\Clubs.xnb" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Content\Hearts.xnb" />
-    <None Include="Content\I.xnb" />
-    <Content Include="Content\Ks.xnb" />
-    <Content Include="Content\La.xnb" />
-    <None Include="Content\V.xnb" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Content\Diamonds.xnb" />
+    <Content Include="Content\Clubs.xnb" />
+    <Content Include="Content\Mi.xnb" />
     <None Include="Content\Re.xnb" />
+    <Content Include="Content\I.xnb" />
+    <Content Include="Content\Ks.xnb" />
     <Content Include="Content\So.xnb" />
     <None Include="Content\Spades.xnb" />
     <None Include="Content\Ti.xnb" />
   </ItemGroup>
   <ItemGroup>
-    <ImageAsset Include="Assets.xcassets\AppIcon.appiconset\Contents.json" />
-    <ImageAsset Include="Assets.xcassets\Contents.json" />
-    <None Include="Info.plist" />
-    <None Include="Entitlements.plist" />
-    <None Include="packages.config" />
-    <Compile Include="MusicSolitaire.fs" />
-    <Compile Include="AppDelegate.fs" />
-    <Compile Include="Main.fs" />
-    <Content Include="Content\Table.xnb" />
-    <None Include="Content\CardBack.xnb" />
-    <Content Include="Content\Clubs.xnb" />
-    <None Include="Content\Diamonds.xnb" />
-    <None Include="Content\Do.xnb" />
+    <Content Include="Content\CardBack.xnb" />
+    <Content Include="Content\Diamonds.xnb" />
     <None Include="Content\Fa.xnb" />
-    <None Include="Content\Hearts.xnb" />
-    <Content Include="Content\I.xnb" />
-    <None Include="Content\Ks.xnb" />
-    <None Include="Content\La.xnb" />
-    <Content Include="Content\Mi.xnb" />
+    <None Include="Content\Do.xnb" />
+    <None Include="Content\Clubs.xnb" />
+    <None Include="Content\Mi.xnb" />
     <Content Include="Content\Re.xnb" />
+    <Content Include="Content\Hearts.xnb" />
+    <None Include="Content\I.xnb" />
+    <None Include="Content\Ks.xnb" />
+    <Content Include="Content\La.xnb" />
     <None Include="Content\So.xnb" />
     <Content Include="Content\Spades.xnb" />
     <Content Include="Content\Ti.xnb" />
-    <Content Include="Content\V.xnb" />
-    <Content Include="Content\IV.xnb" />
+    <None Include="Content\V.xnb" />
     <Content Include="Content\Do8.xnb" />
+    <Content Include="Content\IV.xnb" />
+    <Content Include="Content\Table.xnb" />
     <None Include="Content\VI.xnb" />
+    <Compile Include="Core.fs" />
+    <Compile Include="Model.fs" />
+    <Compile Include="Update.fs" />
+    <Compile Include="View.fs" />
+    <Compile Include="MusicSolitaireGame.fs" />
+    <Compile Include="AppDelegate.fs" />
+    <Compile Include="Main.fs" />
+    <ImageAsset Include="Assets.xcassets\AppIcon.appiconset\Contents.json" />
+    <ImageAsset Include="Assets.xcassets\Contents.json" />
+    <None Include="Entitlements.plist" />
+    <None Include="Info.plist" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />
 </Project>
