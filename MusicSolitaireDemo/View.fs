@@ -89,6 +89,20 @@ let handleTouchUp position =
         CommitMove DiamondsFoundation
     else if withinBox position clubsFoundationPosition 86.0 115.0 then
         CommitMove ClubsFoundation
+    else if withinBox position tableau1Position 86.0 115.0 then
+        CommitMove Tableau1
+    else if withinBox position tableau2Position 86.0 115.0 then
+        CommitMove Tableau2
+    else if withinBox position tableau3Position 86.0 115.0 then
+        CommitMove Tableau3
+    else if withinBox position tableau4Position 86.0 115.0 then
+        CommitMove Tableau4
+    else if withinBox position tableau5Position 86.0 115.0 then
+        CommitMove Tableau5
+    else if withinBox position tableau6Position 86.0 115.0 then
+        CommitMove Tableau6
+    else if withinBox position tableau7Position 86.0 115.0 then
+        CommitMove Tableau7
     else
         CancelMove
 
@@ -155,7 +169,7 @@ let rec drawFannedPile pile getTextures position touchDown touchUp =
             position = x,y
             touchDown = touchDown pile position
             touchMoved = None
-            touchUp = touchDown pile position
+            touchUp = touchUp pile
         }
         :: (drawFannedPile tail getTextures (x,y+32.0) touchDown touchUp)
 
@@ -168,11 +182,11 @@ let tableau down up tableau position model =
         (fun _ _ -> None)
         (fun _ -> None)
     @ drawFannedPile
-        up
+        (List.rev up)
         cardFront
         (x,(y + 32.0 * (float)(List.length down)))
         (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun _ ->BeginMove (tableau,x,pos))) | _ -> None)
-        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (CommitMove (tableau)) | _ -> None)
+        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun _ -> CommitMove (tableau)) | _ -> None)
 
 let tableaus model =
     tableau [] model.tableau1 Tableau1 tableau1Position model 
@@ -188,7 +202,7 @@ let moving model =
     | None -> []
     | Some (_,cards,position) ->
         drawFannedPile
-            cards
+            (List.rev cards)
             cardFront
             position
             (fun _ _ -> None)

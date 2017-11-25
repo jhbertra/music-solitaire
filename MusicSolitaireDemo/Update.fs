@@ -84,7 +84,7 @@ let areAlternateSuits suit1 suit2 =
 let canPlaceOnFoundation foundation requiredSuit card =
     match foundation,card with
     | [],(suit,KeySignature) -> suit = requiredSuit
-    | [_,targetFace],(suit,face) -> isFace2Higher targetFace face && suit = requiredSuit
+    | (_,targetFace)::_,(suit,face) -> isFace2Higher targetFace face && suit = requiredSuit
     | _ -> false
 
 let canPlaceOnTableau tableau cards =
@@ -312,7 +312,7 @@ let update msg model =
                     moving = None
                     }
                     ,(Msg MoveCommitted)
-            | [card],DiamondsFoundation when canPlaceOnFoundation model.heartsFoundation Diamonds card ->
+            | [card],DiamondsFoundation when canPlaceOnFoundation model.diamondsFoundation Diamonds card ->
                 { model with
                     diamondsFoundation = card :: model.diamondsFoundation
                     moving = None

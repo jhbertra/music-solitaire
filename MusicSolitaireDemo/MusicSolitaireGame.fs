@@ -159,7 +159,6 @@ type MusicSolitaireGame() as this =
         let touchCol = getTouchState (TouchPanel.GetState())
         this.controller <- updateController touchCol this.controller
         this.model <- handleInput revSprites
-        printfn "%A" (touchCol)
         base.Update(gameTime)
 
     //
