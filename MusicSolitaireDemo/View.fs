@@ -78,23 +78,37 @@ let tableau5Position = 434.0,193.0
 let tableau6Position = 536.0,193.0
 let tableau7Position = 638.0,193.0
 
-let background = {
+let withinBox (x,y) (bx,by) bwidth bheight = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
+
+let handleTouchUp position =
+    if withinBox position heartsFoundationPosition 86.0 115.0 then
+        CommitMove HeartsFoundation
+    else if withinBox position spadesFoundationPosition 86.0 115.0 then
+        CommitMove SpadesFoundation
+    else if withinBox position diamondsFoundationPosition 86.0 115.0 then
+        CommitMove DiamondsFoundation
+    else if withinBox position clubsFoundationPosition 86.0 115.0 then
+        CommitMove ClubsFoundation
+    else
+        CancelMove
+
+let background : Sprite<Msg> = {
     textures = ["Table"]
     position = 0.0,0.0
-    tap = None
     touchDown = None
-    touchUp = None
+    touchMoved = (Some Move)
+    touchUp = (Some handleTouchUp)
 }
 
-let drawPile pile getTextures position tap touchDown touchUp =
+let drawPile pile getTextures position touchDown touchMoved touchUp =
     match pile with
     | [] -> []
     | (face, suit)::_ -> 
         [{
             textures = getTextures face suit
             position = position
-            tap = tap
             touchDown = touchDown
+            touchMoved = touchMoved
             touchUp = touchUp
         }]
 
@@ -107,18 +121,18 @@ let stock model =
         model.stock
         cardBack
         stockPosition
-        (Some PopStock)
         None
         None
+        (Some (fun _ -> PopStock))
 
 let faceUpPile cards pile position =
     drawPile
         cards
         cardFront
         position
+        (Some (fun _ -> (BeginMove (pile,1,position))))
         None
-        (Some (BeginMove (pile,1,position)))
-        (Some (CommitMove (pile)))
+        (Some (fun _ -> (CommitMove (pile))))
 
 let talon model =
     faceUpPile
@@ -132,44 +146,42 @@ let foundations model =
     @ faceUpPile model.diamondsFoundation DiamondsFoundation diamondsFoundationPosition
     @ faceUpPile model.clubsFoundation ClubsFoundation clubsFoundationPosition
 
-let rec drawFannedPile pile getTextures position tap touchDown touchUp =
+let rec drawFannedPile pile getTextures position touchDown touchUp =
     match pile,position with
     | [],_ -> []
     | ((face, suit) :: tail),(x,y) ->
         {
             textures = getTextures face suit
             position = x,y
-            tap = tap
-            touchDown = touchDown pile
-            touchUp = touchUp pile
+            touchDown = touchDown pile position
+            touchMoved = None
+            touchUp = touchDown pile position
         }
-        :: (drawFannedPile tail getTextures (x,y+32.0) tap touchDown touchUp)
+        :: (drawFannedPile tail getTextures (x,y+32.0) touchDown touchUp)
 
-let tableau down up tableau position =
+let tableau down up tableau position model =
     let x,y = position
     drawFannedPile 
         down
         cardBack
         (x,y)
-        None
-        (fun _ -> None)
+        (fun _ _ -> None)
         (fun _ -> None)
     @ drawFannedPile
         up
         cardFront
         (x,(y + 32.0 * (float)(List.length down)))
-        None
-        (fun pile -> match List.length pile with x when x > 0 -> (Some (BeginMove (tableau,x,position))) | _ -> None)
-        (fun pile -> match List.length pile with 1 -> Some (CommitMove (tableau)) | _ -> None)
+        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun _ ->BeginMove (tableau,x,pos))) | _ -> None)
+        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (CommitMove (tableau)) | _ -> None)
 
 let tableaus model =
-    tableau [] model.tableau1 Tableau1 tableau1Position
-    @ match model.tableau2 with up,down -> tableau down up Tableau2 tableau2Position
-    @ match model.tableau3 with up,down -> tableau down up Tableau3 tableau3Position
-    @ match model.tableau4 with up,down -> tableau down up Tableau4 tableau4Position
-    @ match model.tableau5 with up,down -> tableau down up Tableau5 tableau5Position
-    @ match model.tableau6 with up,down -> tableau down up Tableau6 tableau6Position
-    @ match model.tableau7 with up,down -> tableau down up Tableau7 tableau7Position
+    tableau [] model.tableau1 Tableau1 tableau1Position model 
+    @ match model.tableau2 with up,down -> tableau down up Tableau2 tableau2Position model 
+    @ match model.tableau3 with up,down -> tableau down up Tableau3 tableau3Position model 
+    @ match model.tableau4 with up,down -> tableau down up Tableau4 tableau4Position model 
+    @ match model.tableau5 with up,down -> tableau down up Tableau5 tableau5Position model 
+    @ match model.tableau6 with up,down -> tableau down up Tableau6 tableau6Position model 
+    @ match model.tableau7 with up,down -> tableau down up Tableau7 tableau7Position model 
 
 let moving model =
     match model.moving with
@@ -179,8 +191,7 @@ let moving model =
             cards
             cardFront
             position
-            None
-            (fun _ -> None)
+            (fun _ _ -> None)
             (fun _ -> None)
         
 

@@ -11,7 +11,7 @@ type Msg =
     | DealCards
     | PopStock
     | BeginMove of Pile * int * (float * float)
-    | SetMovingPosition of float * float
+    | Move of float * float
     | CancelMove
     | CommitMove of Pile
     | MoveCommitted
@@ -100,6 +100,7 @@ let replenish destAndSource =
     | _ -> destAndSource
 
 let update msg model =
+    printfn "%A" msg
     match model.phase,msg with
 
     // Dealing
@@ -210,12 +211,12 @@ let update msg model =
                 ,Term
         | _ -> model,Term
 
-    | PlayingPhase,(SetMovingPosition (x,y)) ->
+    | PlayingPhase,(Move (x,y)) ->
         match model.moving with
         | None -> model,Term
-        | Some (pile,cards,_) ->
+        | Some (pile,cards,(oldX, oldY)) ->
             { model with
-                moving = Some (pile,cards,(x,y))
+                moving = Some (pile,cards,(oldX + x, oldY + y))
                 }
                 ,Term
     | PlayingPhase,CancelMove ->

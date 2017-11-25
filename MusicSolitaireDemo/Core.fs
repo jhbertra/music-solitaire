@@ -1,6 +1,25 @@
 ﻿module Core
 
 //
+// --------- Optional ---------
+//
+
+type OptionalBuilder() =
+  member __.Bind(opt, binder) =
+    match opt with
+    | Some value -> binder value
+    | None -> None
+  member __.Return(value) =
+    Some value
+    
+let optional = OptionalBuilder()
+
+let defaultIfNone defaultValue option =
+    match option with
+    | None -> defaultValue
+    | Some value -> value
+
+//
 // --------- State ---------
 //
 
@@ -61,10 +80,14 @@ type Cmd<'a> =
 type Sprite<'a> = {
     textures : string list
     position : float*float
-    tap : 'a option
-    touchDown : 'a option
-    touchUp : 'a option
+    touchDown : (float*float -> 'a) option
+    touchMoved : (float*float -> 'a) option
+    touchUp : (float*float -> 'a) option
 }
+
+type Sub<'a> =
+    | TouchDrag of (float*float -> 'a)
+    | TouchDragEnd of (float*float -> 'a)
 
 //
 // --------- Other Stuff ---------

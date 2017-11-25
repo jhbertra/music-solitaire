@@ -9,6 +9,58 @@ open Model
 open Update
 open View
 
+type TouchLocationState =
+    | Invalid
+    | Moved
+    | Pressed
+    | Released
+
+type TouchLocation = TouchLocation of int*TouchLocationState*(float*float)
+
+type Touch = { position : float*float }
+type Drag = { position : float*float; delta : float*float }
+
+type TouchState =
+    | TouchDown of Touch
+    | TouchMoved of Drag
+    | TouchUp of Touch
+
+type Controller = (int*TouchState) list
+
+let updateController touchCol controller =
+    let makeTouchState touchLocationState position prevPosition =
+        match touchLocationState with
+        | Pressed -> Some (TouchDown { position = position })
+        | Released -> Some (TouchUp { position = position })
+        | Moved -> Some(TouchMoved { position = position; delta = match position,prevPosition with (x2,y2),(x1,y1) -> (x2 - x1),(y2 - y1)})
+        | _ -> None
+    seq {
+        for TouchLocation (id, state, position) in touchCol do
+            let prevTouch = controller |> Seq.tryFind (fun (prevId,_) -> prevId = id)
+            let newState =
+                match prevTouch with
+                | None -> makeTouchState state position position
+                | Some (_,(TouchDown prevState)) | Some (_,(TouchUp prevState)) -> makeTouchState state position prevState.position
+                | Some (_,(TouchMoved prevState)) -> makeTouchState state position prevState.position
+            match newState with
+            | None -> yield! []
+            | Some newState -> yield id,newState            
+    }
+    |> List.ofSeq
+
+let vector2ToFloatTuple (vec : Vector2) = ((float)vec.X,(float)vec.Y)
+
+let translateTouchLocationState (state: Microsoft.Xna.Framework.Input.Touch.TouchLocationState) =
+    match state with
+    | Microsoft.Xna.Framework.Input.Touch.TouchLocationState.Moved -> Moved
+    | Microsoft.Xna.Framework.Input.Touch.TouchLocationState.Pressed -> Pressed
+    | Microsoft.Xna.Framework.Input.Touch.TouchLocationState.Released -> Released
+    | _ -> Invalid
+    
+let getTouchState (touchCol: TouchCollection) =
+    touchCol
+    |> Seq.map (fun touch -> TouchLocation (touch.Id,(translateTouchLocationState touch.State),(vector2ToFloatTuple touch.Position)))
+
 type MusicSolitaireGame() as this =
     inherit Game()
 
@@ -18,6 +70,7 @@ type MusicSolitaireGame() as this =
     [<DefaultValue>] val mutable model : Model
     [<DefaultValue>] val mutable sprites : Sprite<Msg> list
     [<DefaultValue>] val mutable textures : Map<string, Texture2D>
+    [<DefaultValue>] val mutable controller : Controller
     [<DefaultValue>] val mutable spriteBatch : SpriteBatch
 
 
@@ -44,6 +97,7 @@ type MusicSolitaireGame() as this =
         this.spriteBatch <- new SpriteBatch(this.GraphicsDevice)
         this.model <- execCmd initialCmd model
         this.sprites <- view this.model
+        this.controller <- []
         TouchPanel.EnabledGestures <- GestureType.Tap ||| GestureType.FreeDrag ||| GestureType.DragComplete
         base.Initialize()
 
@@ -64,56 +118,48 @@ type MusicSolitaireGame() as this =
     // --------- Update ---------
     //
 
-    let rec gestures _ =
-        if not TouchPanel.IsGestureAvailable then
-            []
-        else 
-            TouchPanel.ReadGesture() :: gestures ()  
+    let positionInSprite (x,y) (sprite : Sprite<Msg>) =
+        let spriteX,spriteY = sprite.position
+        (x - spriteX),(y - spriteY)
 
-    let boundingBox sprite =
-        let x,y = sprite.position
-        let width,height =
-            sprite.textures
-            |> List.map (fun t -> Map.find t this.textures)
-            |> List.fold (fun (width,height) t -> (max width t.Width),(max height t.Height)) (0, 0)
-        (x, y),((float)width + x, (float)height + y)
+    let spriteSize (sprite : Sprite<Msg>) =
+        sprite.textures
+        |> List.map (fun t -> Map.find t this.textures)
+        |> List.fold (fun (width,height) t -> (max width ((float)t.Width)),(max height ((float)t.Height))) (0.0, 0.0)
 
-    let isInSprite (position : Vector2) sprite =
-        let (xMin,yMin),(xMax,yMax) = boundingBox sprite
-        ((float)position.X) >= xMin
-        && ((float)position.X) < xMax
-        && ((float)position.Y) >= yMin
-        && ((float)position.Y) < yMax
-
-    let rec msgFromGesture getMsg (gesture : GestureSample) sprites =
+    let rec msgFromGesture handler absPosition handlerPosition sprites =
         match sprites with
         | [] -> None
         | sprite :: tail ->
-            if isInSprite gesture.Position sprite then
-                match getMsg sprite with
-                | Some msg -> Some msg
-                | None -> msgFromGesture getMsg gesture tail
-            else
-                msgFromGesture getMsg gesture tail
+            match handler sprite with
+            | None -> msgFromGesture handler absPosition handlerPosition tail
+            | Some func ->
+                let width,height = spriteSize sprite
+                match positionInSprite absPosition sprite with
+                | (x,y) when x > 0.0 && y > 0.0 && x <= width && y <= height -> Some (func handlerPosition)
+                | _ -> msgFromGesture handler absPosition handlerPosition tail
 
-    let handleGesture sprites model (gesture : GestureSample) =
-        let msg =
-            match gesture.GestureType with
-            | GestureType.Tap -> msgFromGesture (fun sprite -> sprite.tap) gesture sprites
-            | GestureType.FreeDrag -> msgFromGesture (fun sprite -> sprite.touchDown) gesture sprites
-            | GestureType.DragComplete -> msgFromGesture (fun sprite -> sprite.touchUp) gesture sprites
-            | _ -> None
-        match msg with
-        | None -> model
-        | Some msg -> execCmd (Msg msg) model
+    let handleGesture sprites model gesture =
+        optional {
+            let! msg = 
+                match gesture with
+                | TouchDown touch -> msgFromGesture (fun sprite -> sprite.touchDown) touch.position touch.position sprites
+                | TouchMoved drag -> msgFromGesture (fun sprite -> sprite.touchMoved) drag.position drag.delta sprites
+                | TouchUp touch -> msgFromGesture (fun sprite -> sprite.touchUp) touch.position touch.position sprites            
+            return execCmd (Msg msg) model
+        }
+        |> defaultIfNone model       
 
 
-    let handleInput model sprites =
-        List.fold (handleGesture sprites) model (gestures ())
+    let handleInput sprites =
+        List.fold (handleGesture sprites) this.model (List.map snd this.controller)
 
     override __.Update(gameTime) =
         let revSprites = List.rev this.sprites
-        this.model <- handleInput this.model revSprites
+        let touchCol = getTouchState (TouchPanel.GetState())
+        this.controller <- updateController touchCol this.controller
+        this.model <- handleInput revSprites
+        printfn "%A" (touchCol)
         base.Update(gameTime)
 
     //
