@@ -31,6 +31,7 @@ let getSuitContent suit =
 
 type Msg =
     | DealCards
+    | PreparePop
     | PopStock
     | BeginMove of Pile * int * (float * float)
     | Move of float * float
@@ -62,6 +63,7 @@ let initModel rng =
     clubsFoundation = []
     moving = None
     rng = rng
+    popReady = false
     phase = DealPhase 
         {
         deck = 
@@ -122,6 +124,7 @@ let replenish destAndSource =
     | _ -> destAndSource
 
 let update msg model =
+    printfn "%A" msg
     match model.phase,msg with
 
     // Dealing
@@ -144,15 +147,25 @@ let update msg model =
             | [] -> { model with stock = card :: model.stock; phase = DealPhase { deck = remainingDeck; tableauDealMoves = [] } }
             ,Msg DealCards
 
+    | (DealPhase _),_ -> model,Term        
+
     // Playing
 
+    | PlayingPhase,PreparePop -> 
+        { model with
+            popReady = true
+            }
+            ,Term
+
     | PlayingPhase,PopStock -> 
-        match model.stock with
-        | [] -> model,Term
-        | head::tail -> 
+        match (model.popReady),(model.stock) with
+        | false,_ -> model,Term
+        | true,[] -> model,Term
+        | true,(head::tail) -> 
             { model with
                 stock = tail
                 talon = head :: model.talon
+                popReady = false
             }
             ,Term
 
@@ -405,8 +418,13 @@ let update msg model =
                 tableau6 = replenish model.tableau6
                 tableau7 = replenish model.tableau7
                 }
-                ,Term
+                ,Term            
+
+    | PlayingPhase,DealCards -> model,Term            
+
+    // Game End
+
 
     | _,Reset -> initModel model.rng
 
-    | _ -> model,Term
+    | WonPhase,_ -> model,Term

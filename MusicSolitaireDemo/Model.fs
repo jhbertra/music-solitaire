@@ -72,4 +72,5 @@ type Model = {
     clubsFoundation : Card list
     moving : MovingModel option
     rng : System.Random
+    popReady : bool
     }

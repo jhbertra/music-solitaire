@@ -121,7 +121,7 @@ type MusicSolitaireGame() as this =
             manifest.textures
             |> List.fold (fun m t -> Map.add t (this.Content.Load<Texture2D>("textures/" + t)) m) (Map[])
         this.sfx <- 
-            manifest.textures
+            manifest.sfx
             |> List.fold (fun m t -> Map.add t (this.Content.Load<SoundEffect>("sfx/" + t)) m) (Map[])
         base.LoadContent()
 

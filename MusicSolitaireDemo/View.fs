@@ -30,6 +30,7 @@ let contentManifest = {
         getSuitContent Spades
         getSuitContent Diamonds
         getSuitContent Clubs
+        "Reset"
         ]
     sfx =
         [
@@ -129,9 +130,9 @@ let stock model =
         model.stock
         cardBack
         stockPosition
+        (Some (fun _ -> PreparePop))
         None
-        None
-        (Some (fun _ -> PopStock))
+        (if model.popReady then (Some (fun _ -> PopStock)) else None)
 
 let faceUpPile cards pile position =
     drawPile
@@ -210,3 +211,4 @@ let view model =
     @ foundations model
     @ tableaus model
     @ moving model
+    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Reset))}]
