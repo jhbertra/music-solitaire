@@ -2,6 +2,7 @@
 
 open Microsoft.Xna.Framework
 open Microsoft.Xna.Framework.Graphics
+open Microsoft.Xna.Framework.Audio
 open Microsoft.Xna.Framework.Input.Touch
 
 open Core
@@ -70,6 +71,7 @@ type MusicSolitaireGame() as this =
     [<DefaultValue>] val mutable model : Model
     [<DefaultValue>] val mutable sprites : Sprite<Msg> list
     [<DefaultValue>] val mutable textures : Map<string, Texture2D>
+    [<DefaultValue>] val mutable sfx : Map<string, SoundEffect>
     [<DefaultValue>] val mutable controller : Controller
     [<DefaultValue>] val mutable spriteBatch : SpriteBatch
 
@@ -82,6 +84,12 @@ type MusicSolitaireGame() as this =
             | Msg msg -> 
                 let newModel,nextCmd = update msg model
                 do! putState newModel
+                return! runCmd nextCmd
+            | PlaySound(sound, nextCmd) ->
+                optional {
+                    let! sfx = this.sfx.TryFind sound
+                    sfx.Play() |> ignore
+                } |> ignore
                 return! runCmd nextCmd
             }
 
@@ -111,7 +119,10 @@ type MusicSolitaireGame() as this =
         this.Content.RootDirectory <- manifest.root
         this.textures <- 
             manifest.textures
-            |> List.fold (fun m t -> Map.add t (this.Content.Load<Texture2D>(t)) m) (Map[])
+            |> List.fold (fun m t -> Map.add t (this.Content.Load<Texture2D>("textures/" + t)) m) (Map[])
+        this.sfx <- 
+            manifest.textures
+            |> List.fold (fun m t -> Map.add t (this.Content.Load<SoundEffect>("sfx/" + t)) m) (Map[])
         base.LoadContent()
 
     //

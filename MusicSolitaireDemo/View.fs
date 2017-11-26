@@ -8,28 +8,6 @@ open Update
 // --------- Content Declarations ---------
 //
 
-let getFaceContent face =
-    match face with
-        | KeySignature -> "Ks"
-        | Do -> "Do"
-        | Re -> "Re"
-        | Mi -> "Mi"
-        | Fa -> "Fa"
-        | So -> "So"
-        | La -> "La"
-        | Ti -> "Ti"
-        | Do8 -> "Do8"
-        | IV -> "IV"
-        | V -> "V"
-        | I -> "I"
-
-let getSuitContent suit =
-    match suit with
-        | Hearts -> "Hearts"
-        | Spades -> "Spades"
-        | Diamonds -> "Diamonds"
-        | Clubs -> "Clubs"
-
 let contentManifest = {
     root = "Content"
     textures = 
@@ -52,6 +30,22 @@ let contentManifest = {
         getSuitContent Spades
         getSuitContent Diamonds
         getSuitContent Clubs
+        ]
+    sfx =
+        [
+        getFaceContent KeySignature
+        getFaceContent Do
+        getFaceContent Re
+        getFaceContent Mi
+        getFaceContent Fa
+        getFaceContent So
+        getFaceContent La
+        getFaceContent Ti
+        getFaceContent Do8
+        getFaceContent IV
+        getFaceContent V
+        getFaceContent I
+        "Stack"
         ]
 }
 

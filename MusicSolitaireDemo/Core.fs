@@ -5,12 +5,17 @@
 //
 
 type OptionalBuilder() =
-  member __.Bind(opt, binder) =
-    match opt with
-    | Some value -> binder value
-    | None -> None
-  member __.Return(value) =
-    Some value
+
+    member __.Bind(opt, binder) =
+        match opt with
+        | Some value -> binder value
+        | None -> None
+
+    member __.Return(value) =
+        Some value
+
+    member __.Zero() =
+        None
     
 let optional = OptionalBuilder()
 
@@ -71,11 +76,13 @@ let execState state initial = runState state initial |> snd
 type ContentManifest = {
     root : string
     textures : string list
+    sfx: string list
 }
 
 type Cmd<'a> =
     | Term
     | Msg of 'a
+    | PlaySound of string * Cmd<'a>
 
 type Sprite<'a> = {
     textures : string list

@@ -3,6 +3,28 @@
 open Core
 open Model
 
+let getFaceContent face =
+    match face with
+        | KeySignature -> "Ks"
+        | Do -> "Do"
+        | Re -> "Re"
+        | Mi -> "Mi"
+        | Fa -> "Fa"
+        | So -> "So"
+        | La -> "La"
+        | Ti -> "Ti"
+        | Do8 -> "Do8"
+        | IV -> "IV"
+        | V -> "V"
+        | I -> "I"
+
+let getSuitContent suit =
+    match suit with
+        | Hearts -> "Hearts"
+        | Spades -> "Spades"
+        | Diamonds -> "Diamonds"
+        | Clubs -> "Clubs"
+
 //
 // --------- Msg ---------
 //
@@ -100,7 +122,6 @@ let replenish destAndSource =
     | _ -> destAndSource
 
 let update msg model =
-    printfn "%A" msg
     match model.phase,msg with
 
     // Dealing
@@ -137,31 +158,31 @@ let update msg model =
 
     | PlayingPhase,(BeginMove (origin, count, pos)) ->
         match model.moving,origin,count with
-        | None,Talon,1 when List.length model.talon > 0 ->
+        | None,Talon,1 when not (List.isEmpty model.talon) ->
             { model with
                 talon = List.skip 1 model.talon
                 moving = Some (origin,(List.take 1 model.talon),pos)
                 }
                 ,Term
-        | None,HeartsFoundation,1 when List.length model.heartsFoundation > 0 ->
+        | None,HeartsFoundation,1 when not (List.isEmpty model.heartsFoundation) ->
             { model with
                 heartsFoundation = List.skip 1 model.heartsFoundation
                 moving = Some (origin,(List.take 1 model.heartsFoundation),pos)
                 }
                 ,Term
-        | None,SpadesFoundation,1 when List.length model.spadesFoundation > 0 ->
+        | None,SpadesFoundation,1 when not (List.isEmpty model.spadesFoundation) ->
             { model with
                 spadesFoundation = List.skip 1 model.spadesFoundation
                 moving = Some (origin,(List.take 1 model.spadesFoundation),pos)
                 }
                 ,Term
-        | None,DiamondsFoundation,1 when List.length model.diamondsFoundation > 0 ->
+        | None,DiamondsFoundation,1 when not (List.isEmpty model.diamondsFoundation) ->
             { model with
                 diamondsFoundation = List.skip 1 model.diamondsFoundation
                 moving = Some (origin,(List.take 1 model.diamondsFoundation),pos)
                 }
                 ,Term
-        | None,ClubsFoundation,1 when List.length model.clubsFoundation > 0 ->
+        | None,ClubsFoundation,1 when not (List.isEmpty model.clubsFoundation) ->
             { model with
                 clubsFoundation = List.skip 1 model.clubsFoundation
                 moving = Some (origin,(List.take 1 model.clubsFoundation),pos)
@@ -305,25 +326,25 @@ let update msg model =
                     heartsFoundation = card :: model.heartsFoundation
                     moving = None
                     }
-                    ,(Msg MoveCommitted)
+                    ,(PlaySound ((getFaceContent (snd card)),(Msg MoveCommitted)))
             | [card],SpadesFoundation when canPlaceOnFoundation model.spadesFoundation Spades card ->
                 { model with
                     spadesFoundation = card :: model.spadesFoundation
                     moving = None
                     }
-                    ,(Msg MoveCommitted)
+                    ,(PlaySound ((getFaceContent (snd card)),(Msg MoveCommitted)))
             | [card],DiamondsFoundation when canPlaceOnFoundation model.diamondsFoundation Diamonds card ->
                 { model with
                     diamondsFoundation = card :: model.diamondsFoundation
                     moving = None
                     }
-                    ,(Msg MoveCommitted)
+                    ,(PlaySound ((getFaceContent (snd card)),(Msg MoveCommitted)))
             | [card],ClubsFoundation when canPlaceOnFoundation model.clubsFoundation Clubs card ->
                 { model with
                     clubsFoundation = card :: model.clubsFoundation
                     moving = None
                     }
-                    ,(Msg MoveCommitted)
+                    ,(PlaySound ((getFaceContent (snd card)),(Msg MoveCommitted)))
             | cards,Tableau1 when canPlaceOnTableau model.tableau1 cards ->
                 { model with
                     tableau1 = cards @ model.tableau1
@@ -374,7 +395,7 @@ let update msg model =
             { model with
                 phase = WonPhase
                 }
-                ,Term
+                ,(PlaySound ("Stack",Term))
         else 
             { model with
                 tableau2 = replenish model.tableau2
