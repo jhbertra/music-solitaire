@@ -124,7 +124,6 @@ let replenish destAndSource =
     | _ -> destAndSource
 
 let update msg model =
-    printfn "%A" msg
     match model.phase,msg with
 
     // Dealing
@@ -428,3 +427,14 @@ let update msg model =
     | _,Reset -> initModel model.rng
 
     | WonPhase,_ -> model,Term
+
+
+//
+// --------- Subscriptions ---------
+//
+
+let subscriptions model =
+    if Option.isSome model.moving then
+        [(TouchDropped CancelMove)]
+    else
+        []

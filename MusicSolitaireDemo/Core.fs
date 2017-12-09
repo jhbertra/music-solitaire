@@ -92,9 +92,7 @@ type Sprite<'a> = {
     touchUp : (float*float -> 'a) option
 }
 
-type Sub<'a> =
-    | TouchDrag of (float*float -> 'a)
-    | TouchDragEnd of (float*float -> 'a)
+type Sub<'a> = TouchDropped of 'a
 
 //
 // --------- Other Stuff ---------

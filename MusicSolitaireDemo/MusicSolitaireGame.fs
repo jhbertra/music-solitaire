@@ -49,6 +49,13 @@ let updateController touchCol controller =
     }
     |> List.ofSeq
 
+let touchesEqual (cid,_) (TouchLocation (tid,_,_)) = cid = tid 
+
+let droppedTouches touchCol controller =
+    controller
+    |> List.filter (fun (_,state) -> match state with TouchUp _ -> false | _ -> true)
+    |> List.filter (fun touch -> not (touchCol |> List.ofSeq |> (List.exists (touchesEqual touch))))
+
 let vector2ToFloatTuple (vec : Vector2) = ((float)vec.X,(float)vec.Y)
 
 let translateTouchLocationState (state: Microsoft.Xna.Framework.Input.Touch.TouchLocationState) =
@@ -165,11 +172,26 @@ type MusicSolitaireGame() as this =
     let handleInput sprites =
         List.fold (handleGesture sprites) this.model (List.map snd this.controller)
 
+    let handleSub droppedTouches model sub =
+        match sub with
+        | TouchDropped msg ->
+            if List.isEmpty droppedTouches then
+                model
+            else
+                execCmd (Msg msg) model
+
+    let updateSubs droppedTouches =
+        List.fold (handleSub droppedTouches) this.model (subscriptions this.model)
+
     override __.Update(gameTime) =
         let revSprites = List.rev this.sprites
         let touchCol = getTouchState (TouchPanel.GetState())
+        printfn "\n%A\n%A\n" touchCol this.controller
+        let droppedTouches = droppedTouches touchCol this.controller
+        printfn "%A\n" droppedTouches
         this.controller <- updateController touchCol this.controller
         this.model <- handleInput revSprites
+        this.model <- updateSubs droppedTouches
         base.Update(gameTime)
 
     //
