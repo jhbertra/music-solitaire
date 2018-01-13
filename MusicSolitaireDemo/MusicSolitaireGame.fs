@@ -66,8 +66,9 @@ let translateTouchLocationState (state: Microsoft.Xna.Framework.Input.Touch.Touc
     | _ -> Invalid
     
 let getTouchState (touchCol: TouchCollection) =
+    let scale = 750.0 / float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width // temporary hard-coded scaling
     touchCol
-    |> Seq.map (fun touch -> TouchLocation (touch.Id,(translateTouchLocationState touch.State),(vector2ToFloatTuple touch.Position)))
+    |> Seq.map (fun touch -> TouchLocation (touch.Id,(translateTouchLocationState touch.State),((vector2ToFloatTuple >> mapT2 ((*) scale)) touch.Position)))
 
 type MusicSolitaireGame() as this =
     inherit Game()
@@ -186,9 +187,7 @@ type MusicSolitaireGame() as this =
     override __.Update(gameTime) =
         let revSprites = List.rev this.sprites
         let touchCol = getTouchState (TouchPanel.GetState())
-        printfn "\n%A\n%A\n" touchCol this.controller
         let droppedTouches = droppedTouches touchCol this.controller
-        printfn "%A\n" droppedTouches
         this.controller <- updateController touchCol this.controller
         this.model <- handleInput revSprites
         this.model <- updateSubs droppedTouches
@@ -201,9 +200,13 @@ type MusicSolitaireGame() as this =
     override __.Draw gameTime = 
         this.sprites <- view this.model
         this.spriteBatch.Begin()
+        let findTexture t = Map.find t this.textures
+        let scale = float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width / 750.0 // temporary hard-coded scaling
         for sprite in this.sprites do
             for texture in sprite.textures do
-                let x,y = sprite.position
-                this.spriteBatch.Draw(Map.find texture this.textures, Vector2((float32) x, (float32) y), Color.White)
+                let texture2D = findTexture texture
+                let x,y = mapT2 ((*) scale >> int) sprite.position
+                let w,h = mapT2 (float >> (*) scale >> int) (texture2D.Width,texture2D.Height)
+                this.spriteBatch.Draw(texture2D, Rectangle(x, y, w, h), Color.White)
         this.spriteBatch.End()
         base.Draw(gameTime)

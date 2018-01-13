@@ -108,3 +108,7 @@ let shuffleArr (rng: System.Random) arr =
         array.[i] <- array.[j]
         array.[j] <- tmp
     array
+
+let mapT2 f t2 =
+    let a,b = t2
+    (f a, f b)
