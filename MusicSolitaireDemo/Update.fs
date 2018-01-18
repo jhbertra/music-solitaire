@@ -39,6 +39,7 @@ type Msg =
     | CommitMove of Pile
     | MoveCommitted
     | Reset
+    | CardTapped of Card
 
 
 
@@ -175,73 +176,73 @@ let update msg model =
                 talon = List.skip 1 model.talon
                 moving = Some (origin,(List.take 1 model.talon),pos)
                 }
-                ,Term
+                ,PlaySound (model.talon |> List.head |> snd |> getFaceContent,Term)
         | None,HeartsFoundation,1 when not (List.isEmpty model.heartsFoundation) ->
             { model with
                 heartsFoundation = List.skip 1 model.heartsFoundation
                 moving = Some (origin,(List.take 1 model.heartsFoundation),pos)
                 }
-                ,Term
+                ,PlaySound (model.heartsFoundation |> List.head |> snd |> getFaceContent,Term)
         | None,SpadesFoundation,1 when not (List.isEmpty model.spadesFoundation) ->
             { model with
                 spadesFoundation = List.skip 1 model.spadesFoundation
                 moving = Some (origin,(List.take 1 model.spadesFoundation),pos)
                 }
-                ,Term
+                ,PlaySound (model.spadesFoundation |> List.head |> snd |> getFaceContent,Term)
         | None,DiamondsFoundation,1 when not (List.isEmpty model.diamondsFoundation) ->
             { model with
                 diamondsFoundation = List.skip 1 model.diamondsFoundation
                 moving = Some (origin,(List.take 1 model.diamondsFoundation),pos)
                 }
-                ,Term
+                ,PlaySound (model.diamondsFoundation |> List.head |> snd |> getFaceContent,Term)
         | None,ClubsFoundation,1 when not (List.isEmpty model.clubsFoundation) ->
             { model with
                 clubsFoundation = List.skip 1 model.clubsFoundation
                 moving = Some (origin,(List.take 1 model.clubsFoundation),pos)
                 }
-                ,Term
+                ,PlaySound (model.clubsFoundation |> List.head |> snd |> getFaceContent,Term)
         | None,Tableau1,n when n <= List.length model.tableau1 && n > 0 ->
             { model with
                 tableau1 = List.skip n model.tableau1
                 moving = Some (origin,(List.take n model.tableau1),pos)
                 }
-                ,Term
+                ,PlaySound (model.tableau1 |> List.take n |> List.last |> snd |> getFaceContent,Term)
         | None,Tableau2,n when n <= List.length (fst model.tableau2) && n > 0 ->
             { model with
                 tableau2 = (List.skip n (fst model.tableau2)),(snd model.tableau2)
                 moving = Some (origin,(List.take n (fst model.tableau2)),pos)
                 }
-                ,Term
+                ,PlaySound (model.tableau2 |> fst |> List.take n |> List.last |> snd |> getFaceContent,Term)
         | None,Tableau3,n when n <= List.length (fst model.tableau3) && n > 0 ->
             { model with
                 tableau3 = (List.skip n (fst model.tableau3)),(snd model.tableau3)
                 moving = Some (origin,(List.take n (fst model.tableau3)),pos)
                 }
-                ,Term
+                ,PlaySound (model.tableau3 |> fst |> List.take n |> List.last |> snd |> getFaceContent,Term)
         | None,Tableau4,n when n <= List.length (fst model.tableau4) && n > 0 ->
             { model with
                 tableau4 = (List.skip n (fst model.tableau4)),(snd model.tableau4)
                 moving = Some (origin,(List.take n (fst model.tableau4)),pos)
                 }
-                ,Term
+                ,PlaySound (model.tableau4 |> fst |> List.take n |> List.last |> snd |> getFaceContent,Term)
         | None,Tableau5,n when n <= List.length (fst model.tableau5) && n > 0 ->
             { model with
                 tableau5 = (List.skip n (fst model.tableau5)),(snd model.tableau5)
                 moving = Some (origin,(List.take n (fst model.tableau5)),pos)
                 }
-                ,Term
+                ,PlaySound (model.tableau5 |> fst |> List.take n |> List.last |> snd |> getFaceContent,Term)
         | None,Tableau6,n when n <= List.length (fst model.tableau6) && n > 0 ->
             { model with
                 tableau6 = (List.skip n (fst model.tableau6)),(snd model.tableau6)
                 moving = Some (origin,(List.take n (fst model.tableau6)),pos)
                 }
-                ,Term
+                ,PlaySound (model.tableau6 |> fst |> List.take n |> List.last |> snd |> getFaceContent,Term)
         | None,Tableau7,n when n <= List.length (fst model.tableau7) && n > 0 ->
             { model with
                 tableau7 = (List.skip n (fst model.tableau7)),(snd model.tableau7)
                 moving = Some (origin,(List.take n (fst model.tableau7)),pos)
                 }
-                ,Term
+                ,PlaySound (model.tableau7 |> fst |> List.take n |> List.last |> snd |> getFaceContent,Term)
         | _ -> model,Term
 
     | PlayingPhase,(Move (x,y)) ->
@@ -419,7 +420,9 @@ let update msg model =
                 }
                 ,Term            
 
-    | PlayingPhase,DealCards -> model,Term            
+    | PlayingPhase,DealCards -> model,Term
+
+    | PlayingPhase,(CardTapped (_,face)) -> model,PlaySound (getFaceContent face,Term)
 
     // Game End
 

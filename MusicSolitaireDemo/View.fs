@@ -108,18 +108,20 @@ let background : Sprite<Msg> = {
     touchDown = None
     touchMoved = (Some Move)
     touchUp = (Some handleTouchUp)
+    tapped = None
 }
 
-let drawPile pile getTextures position touchDown touchMoved touchUp =
+let drawPile pile getTextures position touchDown touchMoved touchUp tapped =
     match pile with
     | [] -> []
-    | (face, suit)::_ -> 
+    | (suit, face)::_ -> 
         [{
-            textures = getTextures face suit
+            textures = getTextures suit face
             position = position
             touchDown = touchDown
             touchMoved = touchMoved
             touchUp = touchUp
+            tapped = tapped suit face
         }]
 
 let cardBack _ _ = ["CardBack"]
@@ -134,6 +136,7 @@ let stock model =
         (Some (fun _ -> PreparePop))
         None
         (if model.popReady then (Some (fun _ -> PopStock)) else None)
+        (fun _ _ -> None)
 
 let faceUpPile cards pile position =
     drawPile
@@ -143,6 +146,7 @@ let faceUpPile cards pile position =
         (Some (fun _ -> (BeginMove (pile,1,position))))
         None
         (Some (fun _ -> (CommitMove (pile))))
+        (fun suit face -> (suit,face) |> CardTapped |> Some)
 
 let talon model =
     faceUpPile
@@ -156,18 +160,19 @@ let foundations model =
     @ faceUpPile model.diamondsFoundation DiamondsFoundation diamondsFoundationPosition
     @ faceUpPile model.clubsFoundation ClubsFoundation clubsFoundationPosition
 
-let rec drawFannedPile pile getTextures position touchDown touchUp =
+let rec drawFannedPile pile getTextures position touchDown touchUp tapped =
     match pile,position with
     | [],_ -> []
-    | ((face, suit) :: tail),(x,y) ->
+    | ((suit, face) :: tail),(x,y) ->
         {
-            textures = getTextures face suit
+            textures = getTextures suit face
             position = x,y
             touchDown = touchDown pile position
             touchMoved = None
             touchUp = touchUp pile
+            tapped = tapped face suit
         }
-        :: (drawFannedPile tail getTextures (x,y+32.0) touchDown touchUp)
+        :: (drawFannedPile tail getTextures (x,y+32.0) touchDown touchUp tapped)
 
 let tableau down up tableau position model =
     let x,y = position
@@ -177,12 +182,14 @@ let tableau down up tableau position model =
         (x,y)
         (fun _ _ -> None)
         (fun _ -> None)
+        (fun _ _ -> None)
     @ drawFannedPile
         (List.rev up)
         cardFront
         (x,(y + 32.0 * (float)(List.length down)))
         (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun _ ->BeginMove (tableau,x,pos))) | _ -> None)
         (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun _ -> CommitMove (tableau)) | _ -> None)
+        (fun suit face -> (face,suit) |> CardTapped |> Some)
 
 let tableaus model =
     tableau [] model.tableau1 Tableau1 tableau1Position model 
@@ -203,6 +210,7 @@ let moving model =
             position
             (fun _ _ -> None)
             (fun _ -> None)
+            (fun _ _ -> None)
         
 
 let view model =
@@ -212,4 +220,4 @@ let view model =
     @ foundations model
     @ tableaus model
     @ moving model
-    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Reset))}]
+    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Reset)); tapped = None}]
