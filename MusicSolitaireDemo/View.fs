@@ -57,46 +57,47 @@ let contentManifest = {
 //
 
 // Top Row
-let heartsFoundationPosition = 26.0,26.0
-let spadesFoundationPosition = 128.0,26.0
-let diamondsFoundationPosition = 230.0,26.0
-let clubsFoundationPosition = 332.0,26.0
-let talonPosition = 536.0,26.0
-let stockPosition = 638.0,26.0
+let heartsFoundationPosition = 26.0,56.0
+let spadesFoundationPosition = 128.0,56.0
+let diamondsFoundationPosition = 230.0,56.0
+let clubsFoundationPosition = 332.0,56.0
+let talonPosition = 536.0,56.0
+let stockPosition = 638.0,56.0
 
 // Bottom Row
-let tableau1Position = 26.0,193.0
-let tableau2Position = 128.0,193.0
-let tableau3Position = 230.0,193.0
-let tableau4Position = 332.0,193.0
-let tableau5Position = 434.0,193.0
-let tableau6Position = 536.0,193.0
-let tableau7Position = 638.0,193.0
+let tableau1Position = 26.0,223.0
+let tableau2Position = 128.0,223.0
+let tableau3Position = 230.0,223.0
+let tableau4Position = 332.0,223.0
+let tableau5Position = 434.0,223.0
+let tableau6Position = 536.0,223.0
+let tableau7Position = 638.0,223.0
 
-let withinBox (x,y) (bx,by) bwidth bheight = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
+let withinBox (x,y) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
 
 let handleTouchUp position =
-    if withinBox position heartsFoundationPosition 86.0 115.0 then
+    let isPositionWithinBox = withinBox position 86.0 115.0
+    if isPositionWithinBox heartsFoundationPosition then
         CommitMove HeartsFoundation
-    else if withinBox position spadesFoundationPosition 86.0 115.0 then
+    else if isPositionWithinBox spadesFoundationPosition then
         CommitMove SpadesFoundation
-    else if withinBox position diamondsFoundationPosition 86.0 115.0 then
+    else if isPositionWithinBox diamondsFoundationPosition then
         CommitMove DiamondsFoundation
-    else if withinBox position clubsFoundationPosition 86.0 115.0 then
+    else if isPositionWithinBox clubsFoundationPosition then
         CommitMove ClubsFoundation
-    else if withinBox position tableau1Position 86.0 115.0 then
+    else if isPositionWithinBox tableau1Position then
         CommitMove Tableau1
-    else if withinBox position tableau2Position 86.0 115.0 then
+    else if isPositionWithinBox tableau2Position then
         CommitMove Tableau2
-    else if withinBox position tableau3Position 86.0 115.0 then
+    else if isPositionWithinBox tableau3Position then
         CommitMove Tableau3
-    else if withinBox position tableau4Position 86.0 115.0 then
+    else if isPositionWithinBox tableau4Position then
         CommitMove Tableau4
-    else if withinBox position tableau5Position 86.0 115.0 then
+    else if isPositionWithinBox tableau5Position then
         CommitMove Tableau5
-    else if withinBox position tableau6Position 86.0 115.0 then
+    else if isPositionWithinBox tableau6Position then
         CommitMove Tableau6
-    else if withinBox position tableau7Position 86.0 115.0 then
+    else if isPositionWithinBox tableau7Position then
         CommitMove Tableau7
     else
         CancelMove
