@@ -91,6 +91,7 @@ type Sprite<'a> = {
     touchMoved : (float*float -> 'a) option
     touchUp : (float*float -> 'a) option
     tapped : 'a option
+    alpha : float
 }
 
 type Sub<'a> = TouchDropped of 'a

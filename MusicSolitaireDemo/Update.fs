@@ -40,6 +40,7 @@ type Msg =
     | MoveCommitted
     | Reset
     | CardTapped of Card
+    | FlipStock
 
 
 
@@ -423,6 +424,13 @@ let update msg model =
     | PlayingPhase,DealCards -> model,Term
 
     | PlayingPhase,(CardTapped (_,face)) -> model,PlaySound (getFaceContent face,Term)
+
+    | PlayingPhase,FlipStock -> 
+        { model with
+            talon = []
+            stock = List.rev model.talon 
+            }
+            ,Term
 
     // Game End
 

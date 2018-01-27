@@ -109,6 +109,7 @@ let background : Sprite<Msg> = {
     touchMoved = (Some Move)
     touchUp = (Some handleTouchUp)
     tapped = None
+    alpha = 1.0
 }
 
 let drawPile pile getTextures position touchDown touchMoved touchUp tapped =
@@ -122,6 +123,7 @@ let drawPile pile getTextures position touchDown touchMoved touchUp tapped =
             touchMoved = touchMoved
             touchUp = touchUp
             tapped = tapped suit face
+            alpha = 1.0
         }]
 
 let cardBack _ _ = ["CardBack"]
@@ -171,6 +173,7 @@ let rec drawFannedPile pile getTextures position touchDown touchUp tapped =
             touchMoved = None
             touchUp = touchUp pile
             tapped = tapped face suit
+            alpha = 1.0
         }
         :: (drawFannedPile tail getTextures (x,y+32.0) touchDown touchUp tapped)
 
@@ -215,9 +218,10 @@ let moving model =
 
 let view model =
     background
+    :: {textures = ["Reset"]; position = (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)); touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> FlipStock)); tapped = None; alpha = 0.5}
     :: stock model
     @ talon model
     @ foundations model
     @ tableaus model
     @ moving model
-    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Reset)); tapped = None}]
+    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Reset)); tapped = None; alpha = 1.0}]

@@ -199,7 +199,7 @@ type MusicSolitaireGame() as this =
 
     override __.Draw gameTime = 
         this.sprites <- view this.model
-        this.spriteBatch.Begin()
+        this.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
         let findTexture t = Map.find t this.textures
         let scale = float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width / 750.0 // temporary hard-coded scaling
         for sprite in this.sprites do
@@ -207,6 +207,6 @@ type MusicSolitaireGame() as this =
                 let texture2D = findTexture texture
                 let x,y = mapT2 ((*) scale >> int) sprite.position
                 let w,h = mapT2 (float >> (*) scale >> int) (texture2D.Width,texture2D.Height)
-                this.spriteBatch.Draw(texture2D, Rectangle(x, y, w, h), Color.White)
+                this.spriteBatch.Draw(texture2D, Rectangle(x, y, w, h), Color.White * float32 sprite.alpha)
         this.spriteBatch.End()
         base.Draw(gameTime)
