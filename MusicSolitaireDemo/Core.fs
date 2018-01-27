@@ -79,10 +79,14 @@ type ContentManifest = {
     sfx: string list
 }
 
+type SoundMode =
+    | Overlap
+    | NoOverlap
+
 type Cmd<'a> =
     | Term
     | Msg of 'a
-    | PlaySound of string * Cmd<'a>
+    | PlaySound of string * SoundMode * Cmd<'a>
 
 type Sprite<'a> = {
     textures : string list

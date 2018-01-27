@@ -79,7 +79,7 @@ type MusicSolitaireGame() as this =
     [<DefaultValue>] val mutable model : Model
     [<DefaultValue>] val mutable sprites : Sprite<Msg> list
     [<DefaultValue>] val mutable textures : Map<string, Texture2D>
-    [<DefaultValue>] val mutable sfx : Map<string, SoundEffect>
+    [<DefaultValue>] val mutable sfx : Map<string, SoundEffectInstance>
     [<DefaultValue>] val mutable controller : Controller
     [<DefaultValue>] val mutable spriteBatch : SpriteBatch
 
@@ -93,10 +93,16 @@ type MusicSolitaireGame() as this =
                 let newModel,nextCmd = update msg model
                 do! putState newModel
                 return! runCmd nextCmd
-            | PlaySound(sound, nextCmd) ->
+            | PlaySound(sound, mode, nextCmd) ->
                 optional {
                     let! sfx = this.sfx.TryFind sound
-                    sfx.Play() |> ignore
+                    match mode with
+                    | Overlap -> sfx.Play() |> ignore
+                    | NoOverlap ->
+                        if sfx.State = SoundState.Stopped then
+                            sfx.Play() |> ignore
+                        else
+                            () |> ignore
                 } |> ignore
                 return! runCmd nextCmd
             }
@@ -130,7 +136,7 @@ type MusicSolitaireGame() as this =
             |> List.fold (fun m t -> Map.add t (this.Content.Load<Texture2D>("textures/" + t)) m) (Map[])
         this.sfx <- 
             manifest.sfx
-            |> List.fold (fun m t -> Map.add t (this.Content.Load<SoundEffect>("sfx/" + t)) m) (Map[])
+            |> List.fold (fun m t -> Map.add t (this.Content.Load<SoundEffect>("sfx/" + t).CreateInstance()) m) (Map[])
         base.LoadContent()
 
     //
