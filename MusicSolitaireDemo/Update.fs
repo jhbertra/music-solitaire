@@ -409,7 +409,7 @@ let update msg model =
             { model with
                 phase = WonPhase
                 }
-                ,(PlaySound ("Stack",Overlap,Term))
+                ,(Delay (1.0, (PlaySound ("Stack",NoOverlap,Term))))
         else 
             { model with
                 tableau2 = replenish model.tableau2

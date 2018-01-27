@@ -28,6 +28,9 @@ type TouchState =
 
 type Controller = (int*TouchState) list
 
+type Event<'a> =
+    | TimerEnd of Cmd<'a>
+
 let updateController touchCol controller =
     let makeTouchState touchLocationState position prevPosition =
         match touchLocationState with
@@ -75,6 +78,7 @@ type MusicSolitaireGame() as this =
 
     let _ = new GraphicsDeviceManager(this)
     let model,initialCmd = initModel(System.Random())
+    let events = System.Collections.Concurrent.ConcurrentQueue<Event<Msg>>()
 
     [<DefaultValue>] val mutable model : Model
     [<DefaultValue>] val mutable sprites : Sprite<Msg> list
@@ -105,6 +109,13 @@ type MusicSolitaireGame() as this =
                             () |> ignore
                 } |> ignore
                 return! runCmd nextCmd
+            | Delay (delay,cmd) ->
+                let timer = new System.Timers.Timer(1000.0 * delay)
+                timer.AutoReset <- false
+                timer.Enabled <- true
+                timer.Elapsed.Add(fun _ -> events.Enqueue(TimerEnd cmd) |> ignore)
+                timer.Start()
+                return model
             }
 
     let execCmd cmd model =
@@ -190,6 +201,20 @@ type MusicSolitaireGame() as this =
     let updateSubs droppedTouches =
         List.fold (handleSub droppedTouches) this.model (subscriptions this.model)
 
+    let processEvent event =
+        match event with
+        | TimerEnd cmd -> runCmd cmd
+
+    let rec processEvents (events : System.Collections.Concurrent.ConcurrentQueue<Event<Msg>>) =
+        state { 
+            match events.TryDequeue() with
+            | false,_ -> return! getState
+            | true,event -> 
+                let! model = (match event with TimerEnd cmd -> runCmd cmd)
+                do! putState model
+                return! processEvents events
+            }
+
     override __.Update(gameTime) =
         let revSprites = List.rev this.sprites
         let touchCol = getTouchState (TouchPanel.GetState())
@@ -197,6 +222,7 @@ type MusicSolitaireGame() as this =
         this.controller <- updateController touchCol this.controller
         this.model <- handleInput revSprites
         this.model <- updateSubs droppedTouches
+        this.model <- lock events (fun () -> execState (processEvents events) this.model)
         base.Update(gameTime)
 
     //
