@@ -77,6 +77,7 @@ type MusicSolitaireGame() as this =
     inherit Game()
 
     let _ = new GraphicsDeviceManager(this)
+    let scale = float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width / 750.0 // temporary hard-coded scaling
     let model,initialCmd = initModel(System.Random())
     let events = System.Collections.Concurrent.ConcurrentQueue<Event<Msg>>()
 
@@ -165,14 +166,17 @@ type MusicSolitaireGame() as this =
     // --------- Update ---------
     //
 
-    let positionInSprite (x,y) (sprite : Sprite<Msg>) =
-        let spriteX,spriteY = sprite.position
+    let position (sprite : Sprite<Msg>) = mapT2 ((*) scale) sprite.position
+
+    let positionInSprite (x,y) sprite =
+        let spriteX,spriteY = position sprite
         (x - spriteX),(y - spriteY)
 
     let spriteSize (sprite : Sprite<Msg>) =
         sprite.textures
         |> List.map (fun t -> Map.find t this.textures)
         |> List.fold (fun (width,height) t -> (max width ((float)t.Width)),(max height ((float)t.Height))) (0.0, 0.0)
+        |> mapT2 ((*) scale)
 
     let rec msgFromGesture handler absPosition handlerPosition sprites =
         match sprites with
@@ -244,11 +248,10 @@ type MusicSolitaireGame() as this =
         this.sprites <- view this.model
         this.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
         let findTexture t = Map.find t this.textures
-        let scale = float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width / 750.0 // temporary hard-coded scaling
         for sprite in this.sprites do
             for texture in sprite.textures do
                 let texture2D = findTexture texture
-                let x,y = mapT2 ((*) scale >> int) sprite.position
+                let x,y = position sprite |> mapT2 int
                 let w,h = mapT2 (float >> (*) scale >> int) (texture2D.Width,texture2D.Height)
                 this.spriteBatch.Draw(texture2D, Rectangle(x, y, w, h), Color.White * float32 sprite.alpha)
         this.spriteBatch.End()
