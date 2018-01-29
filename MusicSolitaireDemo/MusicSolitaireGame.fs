@@ -83,7 +83,8 @@ type MusicSolitaireGame() as this =
     [<DefaultValue>] val mutable model : Model
     [<DefaultValue>] val mutable sprites : Sprite<Msg> list
     [<DefaultValue>] val mutable textures : Map<string, Texture2D>
-    [<DefaultValue>] val mutable sfx : Map<string, SoundEffectInstance>
+    [<DefaultValue>] val mutable sfxInstances : Map<string, SoundEffectInstance>
+    [<DefaultValue>] val mutable sfx : Map<string, SoundEffect>
     [<DefaultValue>] val mutable controller : Controller
     [<DefaultValue>] val mutable spriteBatch : SpriteBatch
 
@@ -97,25 +98,31 @@ type MusicSolitaireGame() as this =
                 let newModel,nextCmd = update msg model
                 do! putState newModel
                 return! runCmd nextCmd
-            | PlaySound(sound, mode, nextCmd) ->
+            | PlaySound(sound, mode, volume, nextCmd) ->
+                printfn "%A" cmd
                 optional {
-                    let! sfx = this.sfx.TryFind sound
-                    match mode with
-                    | Overlap -> sfx.Play() |> ignore
-                    | NoOverlap ->
-                        if sfx.State = SoundState.Stopped then
-                            sfx.Play() |> ignore
-                        else
-                            () |> ignore
+                    let! sfx = this.sfxInstances.TryFind sound
+                    if sfx.State = SoundState.Stopped then
+                        sfx.Volume <- float32 volume
+                        sfx.Play() |> ignore
+                    else
+                        match mode with
+                        | Overlap -> 
+                                let! sfx = this.sfx.TryFind sound
+                                let instance = sfx.CreateInstance()
+                                instance.Volume <- float32 volume
+                                instance.Play() |> ignore
+                        | NoOverlap -> () |> ignore
+                    
                 } |> ignore
                 return! runCmd nextCmd
-            | Delay (delay,cmd) ->
+            | Delay (delay,nextCmd,delayCmd) ->
                 let timer = new System.Timers.Timer(1000.0 * delay)
                 timer.AutoReset <- false
                 timer.Enabled <- true
-                timer.Elapsed.Add(fun _ -> events.Enqueue(TimerEnd cmd) |> ignore)
+                timer.Elapsed.Add(fun _ -> events.Enqueue(TimerEnd delayCmd) |> ignore)
                 timer.Start()
-                return model
+                return! runCmd nextCmd
             }
 
     let execCmd cmd model =
@@ -145,9 +152,13 @@ type MusicSolitaireGame() as this =
         this.textures <- 
             manifest.textures
             |> List.fold (fun m t -> Map.add t (this.Content.Load<Texture2D>("textures/" + t)) m) (Map[])
+        let sfxList = manifest.sfx |> List.map (fun s -> (s,this.Content.Load<SoundEffect>("sfx/" + s)))
+        this.sfxInstances <- 
+            sfxList
+            |> List.fold (fun m (s,fx) -> Map.add s (fx.CreateInstance()) m) (Map[])
         this.sfx <- 
-            manifest.sfx
-            |> List.fold (fun m t -> Map.add t (this.Content.Load<SoundEffect>("sfx/" + t).CreateInstance()) m) (Map[])
+            sfxList
+            |> List.fold (fun m (s,fx) -> Map.add s (fx) m) (Map[])
         base.LoadContent()
 
     //

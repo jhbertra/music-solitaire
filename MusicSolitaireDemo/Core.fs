@@ -86,8 +86,8 @@ type SoundMode =
 type Cmd<'a> =
     | Term
     | Msg of 'a
-    | PlaySound of string * SoundMode * Cmd<'a>
-    | Delay of float * Cmd<'a>
+    | PlaySound of string * SoundMode * float * Cmd<'a>
+    | Delay of float * Cmd<'a> * Cmd<'a>
 
 type Sprite<'a> = {
     textures : string list

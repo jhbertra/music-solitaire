@@ -46,6 +46,17 @@ let contentManifest = {
         getFaceContent IV
         getFaceContent V
         getFaceContent I
+        (getFaceContent Do) + "_Sus"
+        (getFaceContent Re) + "_Sus"
+        (getFaceContent Mi) + "_Sus"
+        (getFaceContent Fa) + "_Sus"
+        (getFaceContent So) + "_Sus"
+        (getFaceContent La) + "_Sus"
+        (getFaceContent Ti) + "_Sus"
+        (getFaceContent Do8) + "_Sus"
+        (getFaceContent IV) + "_Sus"
+        (getFaceContent V) + "_Sus"
+        (getFaceContent I) + "_Sus"
         "Stack"
         ]
 }
@@ -206,7 +217,7 @@ let tableaus model =
 let moving model =
     match model.moving with
     | None -> []
-    | Some (_,cards,position) ->
+    | Some (_,cards,position,_) ->
         drawFannedPile
             (List.rev cards)
             cardFront

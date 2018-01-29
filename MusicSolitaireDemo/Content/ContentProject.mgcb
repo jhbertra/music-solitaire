@@ -319,3 +319,69 @@
 /processorParam:TextureFormat=Color
 /build:textures/Reset.png
 
+#begin sfx/Do8_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/Do8_Sus.wav
+
+#begin sfx/Do_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/Do_Sus.wav
+
+#begin sfx/Fa_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/Fa_Sus.wav
+
+#begin sfx/La_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/La_Sus.wav
+
+#begin sfx/So_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/So_Sus.wav
+
+#begin sfx/Ti_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/Ti_Sus.wav
+
+#begin sfx/Re_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/Re_Sus.wav
+
+#begin sfx/IV_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/IV_Sus.wav
+
+#begin sfx/I_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/I_Sus.wav
+
+#begin sfx/Mi_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/Mi_Sus.wav
+
+#begin sfx/V_Sus.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sfx/V_Sus.wav
+
