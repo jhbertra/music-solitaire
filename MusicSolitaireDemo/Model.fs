@@ -53,7 +53,7 @@ type Phase =
     | PlayingPhase
     | WonPhase
 
-type MovingModel = Pile * Card list * (float * float) * string option
+type MovingModel = Pile * Card list * (float * float) * string option * int
 
 type Model = {
     phase : Phase

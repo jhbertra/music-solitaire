@@ -33,10 +33,10 @@ type Msg =
     | DealCards
     | PreparePop
     | PopStock
-    | BeginMove of Pile * int * (float * float)
-    | Move of float * float
-    | CancelMove
-    | CommitMove of Pile
+    | BeginMove of Pile * int * (float * float)*int
+    | Move of (float * float)*int
+    | TouchDropped of int
+    | CommitMove of Pile*int
     | MoveCommitted
     | Reset
     | CardTapped of Card
@@ -171,7 +171,7 @@ let update msg model =
             }
             ,Term
 
-    | PlayingPhase,(BeginMove (origin, count, pos)) ->
+    | PlayingPhase,(BeginMove (origin, count, pos, id)) ->
         let pileSound = List.head >> snd >> getFaceContent >> Some
         let tableauSound = (fun n -> fst >> List.take n >> List.last >> snd >> getFaceContent >> Some)
         let susSound = Option.map (fun s -> s + "_Sus")
@@ -181,84 +181,84 @@ let update msg model =
                 let sound = pileSound model.talon
                 { model with
                     talon = List.skip 1 model.talon
-                    moving = Some (origin,(List.take 1 model.talon),pos,susSound sound)
+                    moving = Some (origin,(List.take 1 model.talon),pos,susSound sound, id)
                     }
                     ,sound
             | None,HeartsFoundation,1 when not (List.isEmpty model.heartsFoundation) ->
                 let sound = pileSound model.heartsFoundation
                 { model with
                     heartsFoundation = List.skip 1 model.heartsFoundation
-                    moving = Some (origin,(List.take 1 model.heartsFoundation),pos,susSound sound)
+                    moving = Some (origin,(List.take 1 model.heartsFoundation),pos,susSound sound, id)
                     }
                     ,sound
             | None,SpadesFoundation,1 when not (List.isEmpty model.spadesFoundation) ->
                 let sound = pileSound model.spadesFoundation
                 { model with
                     spadesFoundation = List.skip 1 model.spadesFoundation
-                    moving = Some (origin,(List.take 1 model.spadesFoundation),pos,susSound sound)
+                    moving = Some (origin,(List.take 1 model.spadesFoundation),pos,susSound sound, id)
                     }
                     ,sound
             | None,DiamondsFoundation,1 when not (List.isEmpty model.diamondsFoundation) ->
                 let sound = pileSound model.diamondsFoundation
                 { model with
                     diamondsFoundation = List.skip 1 model.diamondsFoundation
-                    moving = Some (origin,(List.take 1 model.diamondsFoundation),pos,susSound sound)
+                    moving = Some (origin,(List.take 1 model.diamondsFoundation),pos,susSound sound, id)
                     }
                     ,sound
             | None,ClubsFoundation,1 when not (List.isEmpty model.clubsFoundation) ->
                 let sound = pileSound model.clubsFoundation
                 { model with
                     clubsFoundation = List.skip 1 model.clubsFoundation
-                    moving = Some (origin,(List.take 1 model.clubsFoundation),pos,susSound sound)
+                    moving = Some (origin,(List.take 1 model.clubsFoundation),pos,susSound sound, id)
                     }
                     ,sound
             | None,Tableau1,n when n <= List.length model.tableau1 && n > 0 ->
                 let sound = tableauSound n (model.tableau1,[])
                 { model with
                     tableau1 = List.skip n model.tableau1
-                    moving = Some (origin,(List.take n model.tableau1),pos,susSound sound)
+                    moving = Some (origin,(List.take n model.tableau1),pos,susSound sound, id)
                     }
                     ,sound
             | None,Tableau2,n when n <= List.length (fst model.tableau2) && n > 0 ->
                 let sound = tableauSound n model.tableau2
                 { model with
                     tableau2 = (List.skip n (fst model.tableau2)),(snd model.tableau2)
-                    moving = Some (origin,(List.take n (fst model.tableau2)),pos,susSound sound)
+                    moving = Some (origin,(List.take n (fst model.tableau2)),pos,susSound sound, id)
                     }
                     ,sound
             | None,Tableau3,n when n <= List.length (fst model.tableau3) && n > 0 ->
                 let sound = tableauSound n model.tableau3
                 { model with
                     tableau3 = (List.skip n (fst model.tableau3)),(snd model.tableau3)
-                    moving = Some (origin,(List.take n (fst model.tableau3)),pos,susSound sound)
+                    moving = Some (origin,(List.take n (fst model.tableau3)),pos,susSound sound, id)
                     }
                     ,sound
             | None,Tableau4,n when n <= List.length (fst model.tableau4) && n > 0 ->
                 let sound = tableauSound n model.tableau4
                 { model with
                     tableau4 = (List.skip n (fst model.tableau4)),(snd model.tableau4)
-                    moving = Some (origin,(List.take n (fst model.tableau4)),pos,susSound sound)
+                    moving = Some (origin,(List.take n (fst model.tableau4)),pos,susSound sound, id)
                     }
                     ,sound
             | None,Tableau5,n when n <= List.length (fst model.tableau5) && n > 0 ->
                 let sound = tableauSound n model.tableau5
                 { model with
                     tableau5 = (List.skip n (fst model.tableau5)),(snd model.tableau5)
-                    moving = Some (origin,(List.take n (fst model.tableau5)),pos,susSound sound)
+                    moving = Some (origin,(List.take n (fst model.tableau5)),pos,susSound sound, id)
                     }
                     ,sound
             | None,Tableau6,n when n <= List.length (fst model.tableau6) && n > 0 ->
                 let sound = tableauSound n model.tableau6
                 { model with
                     tableau6 = (List.skip n (fst model.tableau6)),(snd model.tableau6)
-                    moving = Some (origin,(List.take n (fst model.tableau6)),pos,susSound sound)
+                    moving = Some (origin,(List.take n (fst model.tableau6)),pos,susSound sound, id)
                     }
                     ,sound
             | None,Tableau7,n when n <= List.length (fst model.tableau7) && n > 0 ->
                 let sound = tableauSound n model.tableau7
                 { model with
                     tableau7 = (List.skip n (fst model.tableau7)),(snd model.tableau7)
-                    moving = Some (origin,(List.take n (fst model.tableau7)),pos,susSound sound)
+                    moving = Some (origin,(List.take n (fst model.tableau7)),pos,susSound sound, id)
                     }
                     ,sound
             | _ -> model,None
@@ -277,83 +277,83 @@ let update msg model =
                 Msg HandleMovingSound
             )
 
-    | PlayingPhase,(Move (x,y)) ->
+    | PlayingPhase,(Move ((x,y),tid)) ->
         match model.moving with
-        | None -> model,Term
-        | Some (pile,cards,(oldX, oldY),s) ->
+        | Some (pile,cards,(oldX, oldY),s,id) when id = tid ->
             { model with
-                moving = Some (pile,cards,(oldX + x, oldY + y),s)
+                moving = Some (pile,cards,(oldX + x, oldY + y),s,id)
                 }
                 ,Term
-    | PlayingPhase,CancelMove ->
+        | _ -> model,Term
+    | PlayingPhase,TouchDropped tid ->
         match model.moving with
-        | Some (Talon,cards,_,_) -> 
+        | Some (Talon,cards,_,_,id) when id = tid -> 
             { model with
                 talon = cards @ model.talon
                 moving = None
                 }
                 ,Term
-        | Some (HeartsFoundation,cards,_,_) -> 
+        | Some (HeartsFoundation,cards,_,_,id) when id = tid -> 
             { model with
                 heartsFoundation = cards @ model.heartsFoundation
                 moving = None
                 }
                 ,Term
-        | Some (SpadesFoundation,cards,_,_) -> 
+        | Some (SpadesFoundation,cards,_,_,id) when id = tid -> 
             { model with
                 spadesFoundation = cards @ model.spadesFoundation
                 moving = None
                 }
                 ,Term
-        | Some (DiamondsFoundation,cards,_,_) -> 
+        | Some (DiamondsFoundation,cards,_,_,id) when id = tid -> 
             { model with
                 diamondsFoundation = cards @ model.diamondsFoundation
                 moving = None
                 }
                 ,Term
-        | Some (ClubsFoundation,cards,_,_) -> 
+        | Some (ClubsFoundation,cards,_,_,id) when id = tid -> 
             { model with
                 clubsFoundation = cards @ model.clubsFoundation
                 moving = None
                 }
                 ,Term
-        | Some (Tableau1,cards,_,_) -> 
+        | Some (Tableau1,cards,_,_,id) when id = tid -> 
             { model with
                 tableau1 = cards @ model.tableau1
                 moving = None
                 }
                 ,Term
-        | Some (Tableau2,cards,_,_) -> 
+        | Some (Tableau2,cards,_,_,id) when id = tid -> 
             { model with
                 tableau2 = (cards @ (fst model.tableau2),(snd model.tableau2))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau3,cards,_,_) -> 
+        | Some (Tableau3,cards,_,_,id) when id = tid -> 
             { model with
                 tableau3 = (cards @ (fst model.tableau3),(snd model.tableau3))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau4,cards,_,_) -> 
+        | Some (Tableau4,cards,_,_,id) when id = tid -> 
             { model with
                 tableau4 = (cards @ (fst model.tableau4),(snd model.tableau4))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau5,cards,_,_) -> 
+        | Some (Tableau5,cards,_,_,id) when id = tid -> 
             { model with
                 tableau5 = (cards @ (fst model.tableau5),(snd model.tableau5))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau6,cards,_,_) -> 
+        | Some (Tableau6,cards,_,_,id) when id = tid -> 
             { model with
                 tableau6 = (cards @ (fst model.tableau6),(snd model.tableau6))
                 moving = None
                 }
                 ,Term
-        | Some (Tableau7,cards,_,_) -> 
+        | Some (Tableau7,cards,_,_,id) when id = tid -> 
             { model with
                 tableau7 = (cards @ (fst model.tableau7),(snd model.tableau7))
                 moving = None
@@ -361,10 +361,9 @@ let update msg model =
                 ,Term
         | _ -> model,Term
 
-    | PlayingPhase,(CommitMove target) ->
+    | PlayingPhase,(CommitMove (target,tid)) ->
         match model.moving with
-        | None -> model,Term
-        | Some (_,cards,_,_) ->
+        | Some (_,cards,_,_,id) when tid = id ->
             match cards,target with
             | [card],HeartsFoundation when canPlaceOnFoundation model.heartsFoundation Hearts card ->
                 { model with
@@ -432,7 +431,8 @@ let update msg model =
                     moving = None
                     }
                     ,(Msg MoveCommitted)
-            | _ -> model,(Msg CancelMove)
+            | _ -> model,(Msg (TouchDropped id))
+        | _ -> model,Term
 
     | PlayingPhase,MoveCommitted ->
         if [model.heartsFoundation;model.spadesFoundation;model.diamondsFoundation;model.clubsFoundation] |> List.map List.length = [12;12;12;12]
@@ -465,7 +465,7 @@ let update msg model =
 
     | PlayingPhase,HandleMovingSound ->
         match model.moving with
-        | Some (_,_,_,Some sound) -> model,Delay (1.0,PlaySound (sound,Overlap,0.5,Term),Msg HandleMovingSound)
+        | Some (_,_,_,Some sound,_) -> model,Delay (1.0,PlaySound (sound,Overlap,0.5,Term),Msg HandleMovingSound)
         | _ -> model,Term
 
     // Game End
@@ -482,6 +482,6 @@ let update msg model =
 
 let subscriptions model =
     if Option.isSome model.moving then
-        [(TouchDropped CancelMove)]
+        [(Sub.TouchDropped TouchDropped)]
     else
         []

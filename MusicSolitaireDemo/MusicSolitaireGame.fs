@@ -190,28 +190,26 @@ type MusicSolitaireGame() as this =
                 | (x,y) when x > 0.0 && y > 0.0 && x <= width && y <= height -> Some (func handlerPosition)
                 | _ -> msgFromGesture handler absPosition handlerPosition tail
 
-    let handleGesture sprites model gesture =
+    let handleGesture sprites model (id,gesture) =
         optional {
-            let! cmd = 
+            let! getCmd = 
                 match gesture with
                 | TouchDown touch -> msgFromGesture (fun sprite -> sprite.touchDown) touch.position touch.position sprites
                 | TouchMoved drag -> msgFromGesture (fun sprite -> sprite.touchMoved) drag.position drag.delta sprites
                 | TouchUp touch -> msgFromGesture (fun sprite -> sprite.touchUp) touch.position touch.position sprites            
-            return execCmd cmd model
+            return execCmd (getCmd id) model
         }
         |> defaultIfNone model       
 
 
     let handleInput sprites =
-        List.fold (handleGesture sprites) this.model (List.map snd this.controller)
+        List.fold (handleGesture sprites) this.model this.controller
 
     let handleSub droppedTouches model sub =
         match sub with
-        | TouchDropped msg ->
-            if List.isEmpty droppedTouches then
-                model
-            else
-                execCmd (Msg msg) model
+        | Sub.TouchDropped getMsg ->
+            List.fold (fun m t -> execCmd (Msg (getMsg t)) model) model (List.map fst droppedTouches)
+
 
     let updateSubs droppedTouches =
         List.fold (handleSub droppedTouches) this.model (subscriptions this.model)

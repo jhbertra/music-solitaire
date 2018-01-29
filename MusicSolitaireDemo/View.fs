@@ -86,38 +86,38 @@ let tableau7Position = 638.0,223.0
 
 let withinBox (x,y) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
 
-let handleTouchUp position =
+let handleTouchUp position id =
     let isPositionWithinBox = withinBox position 86.0 115.0
     if isPositionWithinBox heartsFoundationPosition then
-        Msg (CommitMove HeartsFoundation)
+        Msg (CommitMove (HeartsFoundation,id))
     else if isPositionWithinBox spadesFoundationPosition then
-        Msg (CommitMove SpadesFoundation)
+        Msg (CommitMove (SpadesFoundation,id))
     else if isPositionWithinBox diamondsFoundationPosition then
-        Msg (CommitMove DiamondsFoundation)
+        Msg (CommitMove (DiamondsFoundation,id))
     else if isPositionWithinBox clubsFoundationPosition then
-        Msg (CommitMove ClubsFoundation)
+        Msg (CommitMove (ClubsFoundation,id))
     else if isPositionWithinBox tableau1Position then
-        Msg (CommitMove Tableau1)
+        Msg (CommitMove (Tableau1,id))
     else if isPositionWithinBox tableau2Position then
-        Msg (CommitMove Tableau2)
+        Msg (CommitMove (Tableau2,id))
     else if isPositionWithinBox tableau3Position then
-        Msg (CommitMove Tableau3)
+        Msg (CommitMove (Tableau3,id))
     else if isPositionWithinBox tableau4Position then
-        Msg (CommitMove Tableau4)
+        Msg (CommitMove (Tableau4,id))
     else if isPositionWithinBox tableau5Position then
-        Msg (CommitMove Tableau5)
+        Msg (CommitMove (Tableau5,id))
     else if isPositionWithinBox tableau6Position then
-        Msg (CommitMove Tableau6)
+        Msg (CommitMove (Tableau6,id))
     else if isPositionWithinBox tableau7Position then
-        Msg (CommitMove Tableau7)
+        Msg (CommitMove (Tableau7,id))
     else
-        Msg (CancelMove)
+        Msg (TouchDropped id)
 
 let background : Sprite<Msg> = {
     textures = ["Table"]
     position = 0.0,0.0
     touchDown = None
-    touchMoved = (Some (Move >> Msg))
+    touchMoved = (Some (fun pos id -> Msg (Move (pos,id))))
     touchUp = (Some handleTouchUp)
     tapped = None
     alpha = 1.0
@@ -146,9 +146,9 @@ let stock model =
         model.stock
         cardBack
         stockPosition
-        (Some (fun _ -> Msg PreparePop))
+        (Some (fun _ -> (fun _ -> Msg PreparePop)))
         None
-        (if model.popReady then (Some (fun _ -> Msg PopStock)) else None)
+        (if model.popReady then (Some (fun _ -> (fun _ -> Msg PopStock))) else None)
         (fun _ _ -> None)
 
 let faceUpPile cards pile position =
@@ -156,9 +156,9 @@ let faceUpPile cards pile position =
         cards
         cardFront
         position
-        (Some (fun _ -> Msg (BeginMove (pile,1,position))))
+        (Some (fun _ -> (fun id -> Msg (BeginMove (pile,1,position,id)))))
         None
-        (Some (fun _ -> Msg (CommitMove (pile))))
+        (Some (fun _ -> (fun id -> Msg (CommitMove (pile,id)))))
         (fun suit face -> (suit,face) |> CardTapped |> Some)
 
 let talon model =
@@ -201,8 +201,8 @@ let tableau down up tableau position model =
         (List.rev up)
         cardFront
         (x,(y + 32.0 * (float)(List.length down)))
-        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun _ -> Msg (BeginMove (tableau,x,pos)))) | _ -> None)
-        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun _ -> Msg (CommitMove (tableau))) | _ -> None)
+        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun _ -> (fun id -> Msg (BeginMove (tableau,x,pos,id))))) | _ -> None)
+        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun _ -> (fun id -> Msg (CommitMove (tableau,id)))) | _ -> None)
         (fun suit face -> (face,suit) |> CardTapped |> Some)
 
 let tableaus model =
@@ -217,7 +217,7 @@ let tableaus model =
 let moving model =
     match model.moving with
     | None -> []
-    | Some (_,cards,position,_) ->
+    | Some (_,cards,position,_,_) ->
         drawFannedPile
             (List.rev cards)
             cardFront
@@ -229,10 +229,10 @@ let moving model =
 
 let view model =
     background
-    :: {textures = ["Reset"]; position = (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)); touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Msg FlipStock)); tapped = None; alpha = 0.5}
+    :: {textures = ["Reset"]; position = (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)); touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> (fun _ -> Msg FlipStock))); tapped = None; alpha = 0.5}
     :: stock model
     @ talon model
     @ foundations model
     @ tableaus model
     @ moving model
-    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Msg Reset)); tapped = None; alpha = 1.0}]
+    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> (fun _ -> Msg Reset))); tapped = None; alpha = 1.0}]
