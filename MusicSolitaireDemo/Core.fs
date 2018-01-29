@@ -92,9 +92,9 @@ type Cmd<'a> =
 type Sprite<'a> = {
     textures : string list
     position : float*float
-    touchDown : (float*float -> 'a) option
-    touchMoved : (float*float -> 'a) option
-    touchUp : (float*float -> 'a) option
+    touchDown : (float*float -> Cmd<'a>) option
+    touchMoved : (float*float -> Cmd<'a>) option
+    touchUp : (float*float -> Cmd<'a>) option
     tapped : 'a option
     alpha : float
 }

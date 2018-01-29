@@ -89,35 +89,35 @@ let withinBox (x,y) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + 
 let handleTouchUp position =
     let isPositionWithinBox = withinBox position 86.0 115.0
     if isPositionWithinBox heartsFoundationPosition then
-        CommitMove HeartsFoundation
+        Msg (CommitMove HeartsFoundation)
     else if isPositionWithinBox spadesFoundationPosition then
-        CommitMove SpadesFoundation
+        Msg (CommitMove SpadesFoundation)
     else if isPositionWithinBox diamondsFoundationPosition then
-        CommitMove DiamondsFoundation
+        Msg (CommitMove DiamondsFoundation)
     else if isPositionWithinBox clubsFoundationPosition then
-        CommitMove ClubsFoundation
+        Msg (CommitMove ClubsFoundation)
     else if isPositionWithinBox tableau1Position then
-        CommitMove Tableau1
+        Msg (CommitMove Tableau1)
     else if isPositionWithinBox tableau2Position then
-        CommitMove Tableau2
+        Msg (CommitMove Tableau2)
     else if isPositionWithinBox tableau3Position then
-        CommitMove Tableau3
+        Msg (CommitMove Tableau3)
     else if isPositionWithinBox tableau4Position then
-        CommitMove Tableau4
+        Msg (CommitMove Tableau4)
     else if isPositionWithinBox tableau5Position then
-        CommitMove Tableau5
+        Msg (CommitMove Tableau5)
     else if isPositionWithinBox tableau6Position then
-        CommitMove Tableau6
+        Msg (CommitMove Tableau6)
     else if isPositionWithinBox tableau7Position then
-        CommitMove Tableau7
+        Msg (CommitMove Tableau7)
     else
-        CancelMove
+        Msg (CancelMove)
 
 let background : Sprite<Msg> = {
     textures = ["Table"]
     position = 0.0,0.0
     touchDown = None
-    touchMoved = (Some Move)
+    touchMoved = (Some (Move >> Msg))
     touchUp = (Some handleTouchUp)
     tapped = None
     alpha = 1.0
@@ -146,9 +146,9 @@ let stock model =
         model.stock
         cardBack
         stockPosition
-        (Some (fun _ -> PreparePop))
+        (Some (fun _ -> Msg PreparePop))
         None
-        (if model.popReady then (Some (fun _ -> PopStock)) else None)
+        (if model.popReady then (Some (fun _ -> Msg PopStock)) else None)
         (fun _ _ -> None)
 
 let faceUpPile cards pile position =
@@ -156,9 +156,9 @@ let faceUpPile cards pile position =
         cards
         cardFront
         position
-        (Some (fun _ -> (BeginMove (pile,1,position))))
+        (Some (fun _ -> Msg (BeginMove (pile,1,position))))
         None
-        (Some (fun _ -> (CommitMove (pile))))
+        (Some (fun _ -> Msg (CommitMove (pile))))
         (fun suit face -> (suit,face) |> CardTapped |> Some)
 
 let talon model =
@@ -201,8 +201,8 @@ let tableau down up tableau position model =
         (List.rev up)
         cardFront
         (x,(y + 32.0 * (float)(List.length down)))
-        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun _ ->BeginMove (tableau,x,pos))) | _ -> None)
-        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun _ -> CommitMove (tableau)) | _ -> None)
+        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun _ -> Msg (BeginMove (tableau,x,pos)))) | _ -> None)
+        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun _ -> Msg (CommitMove (tableau))) | _ -> None)
         (fun suit face -> (face,suit) |> CardTapped |> Some)
 
 let tableaus model =
@@ -229,10 +229,10 @@ let moving model =
 
 let view model =
     background
-    :: {textures = ["Reset"]; position = (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)); touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> FlipStock)); tapped = None; alpha = 0.5}
+    :: {textures = ["Reset"]; position = (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)); touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Msg FlipStock)); tapped = None; alpha = 0.5}
     :: stock model
     @ talon model
     @ foundations model
     @ tableaus model
     @ moving model
-    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Reset)); tapped = None; alpha = 1.0}]
+    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> Msg Reset)); tapped = None; alpha = 1.0}]

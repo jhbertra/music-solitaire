@@ -188,12 +188,12 @@ type MusicSolitaireGame() as this =
 
     let handleGesture sprites model gesture =
         optional {
-            let! msg = 
+            let! cmd = 
                 match gesture with
                 | TouchDown touch -> msgFromGesture (fun sprite -> sprite.touchDown) touch.position touch.position sprites
                 | TouchMoved drag -> msgFromGesture (fun sprite -> sprite.touchMoved) drag.position drag.delta sprites
                 | TouchUp touch -> msgFromGesture (fun sprite -> sprite.touchUp) touch.position touch.position sprites            
-            return execCmd (Msg msg) model
+            return execCmd cmd model
         }
         |> defaultIfNone model       
 
