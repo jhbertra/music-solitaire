@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "MusicSolitaireDemo", "MusicSolitaireDemo\MusicSolitaireDemo.fsproj", "{4F721B43-B4A2-4773-A18A-6AE5220F1D03}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "MusiclandSolitaire.Core", "MusiclandSolitaire.Core\MusiclandSolitaire.Core.shproj", "{9499C277-D127-433B-A0D8-BD31C63E0F04}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|iPhoneSimulator = Debug|iPhoneSimulator

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>{9499C277-D127-433B-A0D8-BD31C63E0F04}</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>MusiclandSolitaire.Core</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Core.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Touch.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Model.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Update.fs" />
+  </ItemGroup>
+</Project>

@@ -1,6 +1,7 @@
 ﻿module Update
 
 open Core
+open Touch
 open Model
 
 let getFaceContent face =
@@ -43,6 +44,9 @@ type Msg =
     | FlipStock
     | HandleMovingSound
 
+type Tag =
+    | Foo
+
 
 
 //
@@ -82,10 +86,23 @@ let initModel rng =
     ,(Msg DealCards)
 
 
+let 
 
-//
-// --------- Update ---------
-//
+let messages objects gestures = 
+    (gestures |> List.collect messagesFromGesture objects)
+    @ messagesFromObjects objects
+
+let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
+    let gestureResults =
+        touchEvents gameState.model.previousTouches gameState.touches gameState.gameTime
+        |> processEvents gameState.model.pendingGestures
+    let model = 
+        { gameState.model with
+            pendingGestures = pendingGestures gestureResults
+            }
+    messages gameState.objects (gestures gestureResults)
+    |> sendMessages model
+    |> UpdateResult 
 
 let updateTableau tableau faceUp card =
     match tableau with up,down -> if faceUp then card::up,down else up,card::down

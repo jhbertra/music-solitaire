@@ -82,6 +82,7 @@
     <PlatformTarget>x86</PlatformTarget>
     <CodesignProvision>VS: com.ycmused.MusiclandSolitaire Development</CodesignProvision>
   </PropertyGroup>
+  <Import Project="..\MusiclandSolitaire.Core\MusiclandSolitaire.Core.projitems" Label="Shared" Condition="Exists('..\MusiclandSolitaire.Core\MusiclandSolitaire.Core.projitems')" />
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Xml" />
@@ -122,11 +123,9 @@
     <Content Include="Content\sfx\La_Sus.xnb" />
     <Content Include="Content\sfx\Fa_Sus.xnb" />
     <Content Include="Content\sfx\Do_Sus.xnb" />
-    <Compile Include="Core.fs" />
-    <Compile Include="Model.fs" />
-    <Compile Include="Update.fs" />
-    <Compile Include="View.fs" />
     <Compile Include="MusicSolitaireGame.fs" />
+    <Compile Include="View.fs" />
+    <Compile Include="Engine.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
     <ImageAsset Include="Assets.xcassets\AppIcon.appiconset\Contents.json" />

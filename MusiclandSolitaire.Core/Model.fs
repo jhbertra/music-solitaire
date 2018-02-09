@@ -1,5 +1,8 @@
 ﻿module Model
 
+open Core
+open Touch
+
 //
 // --------- Model ---------
 //
@@ -73,4 +76,6 @@ type Model = {
     moving : MovingModel option
     rng : System.Random
     popReady : bool
+    pendingGestures : PendingGesture list
+    previousTouches : Touch list
     }
