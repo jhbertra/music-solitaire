@@ -26,6 +26,10 @@ let defaultIfNone defaultValue option =
     | None -> defaultValue
     | Some value -> value
 
+let optionToSingletonList = function
+| None -> []
+| Some x -> [x]
+
 let mapOption f option =
     match option with
     | None -> None
@@ -41,16 +45,28 @@ let runState initial state = match state with State f -> f initial
 
 type StateBuilder() =
 
-    member inline __.Return(x) = State (fun s -> x,s)
+    member inline this.Return(x) = State (fun s -> x,s)
 
-    member inline __.ReturnFrom(m) = m
+    member inline this.ReturnFrom(m) = m
 
-    member inline __.Bind(m, f) = 
+    member this.Delay f = f ()
+
+    member inline this.Bind(m, f) = 
         State (fun s ->
             let (v, newState) = runState s m
             runState newState (f v))
 
-    member inline __.Zero() = State(fun s -> (),s)
+    member this.Combine (x1, x2) =
+            State(fun state ->
+                let result, state = runState state x1
+                runState state x2)
+
+    member this.For (seq, f) =
+            seq
+            |> Seq.map f
+            |> Seq.reduceBack (fun x1 x2 -> this.Combine (x1, x2))
+
+    member inline this.Zero() = State(fun s -> (),s)
 
 let state = StateBuilder()
 
@@ -96,7 +112,9 @@ type GameTime = {
     isRunningSlowly : bool
 }
 
-type Touch = Touch of int * (float*float)
+type Point = Point of float*float
+
+type Touch = Touch of int * Point
 
 let id (Touch (id,_)) = id
 
@@ -117,7 +135,21 @@ let union (BoundingBox (xa,ya,wa,ha)) (BoundingBox (xb,yb,wb,hb)) =
     let hc = y1c - yc
     BoundingBox (xc, yc, wc, hc)
 
-type Point = Point of float*float
+let intersect (BoundingBox (xa,ya,wa,ha)) (BoundingBox (xb,yb,wb,hb)) =
+    let x1a = xa + wa
+    let x1b = xb + wb
+    let y1a = ya + ha
+    let y1b = yb + hb
+    let xc = max xa xb
+    let yc = max ya yb
+    let x1c = min x1a x1b
+    let y1c = min y1a y1b
+    let wc = x1c - xc
+    let hc = y1c - yc
+    if wc < 0.0 || hc < 0.0 then
+        None
+    else
+        Some (BoundingBox (xc, yc, wc, hc))
 
 type GameObject<'a> = {
     textures : string list
@@ -126,7 +158,11 @@ type GameObject<'a> = {
     tag : 'a
 }
 
-let bounds { textures = _; box = BoundingBox (x,y,w,h); alpha = _; tag = _} = x,y,w,h
+let bounds { box = BoundingBox (x,y,w,h) } = x,y,w,h
+
+let tag { tag = tag } = tag
+
+let box { box = box} = box
 
 type GameObjectDrawRequest<'a> =
     | Area of BoundingBox * 'a
@@ -178,6 +214,9 @@ let mapT2 f t2 =
 let bimapT2 f1 f2 t2 =
     let a,b = t2
     (f1 a, f2 b)
+
+let selectT2 f1 f2 x =
+    (f1 x, f2 x)
 
 let mapT4 f t4 =
     let a,b,c,d = t4

@@ -5,6 +5,8 @@ Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "MusicSolitaireDemo", "Music
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "MusiclandSolitaire.Core", "MusiclandSolitaire.Core\MusiclandSolitaire.Core.shproj", "{9499C277-D127-433B-A0D8-BD31C63E0F04}"
 EndProject
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "MusiclandSolitaire.Tests", "MusiclandSolitaire.Tests\MusiclandSolitaire.Tests.fsproj", "{B6237DB0-55F7-4AEF-967A-B4250D701B9F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|iPhoneSimulator = Debug|iPhoneSimulator
@@ -21,5 +23,13 @@ Global
 		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Release|iPhoneSimulator.Build.0 = Release|iPhoneSimulator
 		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Debug|iPhone.ActiveCfg = Debug|iPhone
 		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Debug|iPhone.Build.0 = Debug|iPhone
+		{B6237DB0-55F7-4AEF-967A-B4250D701B9F}.Debug|iPhoneSimulator.ActiveCfg = Debug|Any CPU
+		{B6237DB0-55F7-4AEF-967A-B4250D701B9F}.Debug|iPhoneSimulator.Build.0 = Debug|Any CPU
+		{B6237DB0-55F7-4AEF-967A-B4250D701B9F}.Release|iPhone.ActiveCfg = Release|Any CPU
+		{B6237DB0-55F7-4AEF-967A-B4250D701B9F}.Release|iPhone.Build.0 = Release|Any CPU
+		{B6237DB0-55F7-4AEF-967A-B4250D701B9F}.Release|iPhoneSimulator.ActiveCfg = Release|Any CPU
+		{B6237DB0-55F7-4AEF-967A-B4250D701B9F}.Release|iPhoneSimulator.Build.0 = Release|Any CPU
+		{B6237DB0-55F7-4AEF-967A-B4250D701B9F}.Debug|iPhone.ActiveCfg = Debug|Any CPU
+		{B6237DB0-55F7-4AEF-967A-B4250D701B9F}.Debug|iPhone.Build.0 = Debug|Any CPU
 	EndGlobalSection
 EndGlobal

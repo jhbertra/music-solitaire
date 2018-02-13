@@ -6,8 +6,6 @@ type GestureSample = GestureSample of GameTime * Touch
 
 let gestureSample gameTime touch  = GestureSample (gameTime, touch)
 
-type Point = float*float
-
 type TouchEventType =
     | TouchDown of Point
     | TouchMoved of Point
@@ -32,13 +30,13 @@ type PendingGestureType =
 
 type PendingGesture = int * PendingGestureType
 
-type Delta = float*float
+type Delta = Delta of float*float
 
 type GestureType =
     | TouchDown of Point
     | TouchUp of Point
     | Tap of Point
-    | Drag of Delta
+    | Drag of Point * Delta
 
 type Gesture = int * GestureType
 
@@ -46,9 +44,9 @@ type EventProcessResult =
     | PendingGesture of PendingGesture
     | Gesture of Gesture
 
-let distance (x1,y1) (x2,y2) = sqrt ((x2 - x1)**2.0 + (y2 - y1)**2.0)
+let distance (Point (x1,y1)) (Point (x2,y2)) = sqrt ((x2 - x1)**2.0 + (y2 - y1)**2.0)
 
-let subtract (x1,y1) (x2,y2) = (x2 - x1, y2 - y1)
+let subtract (Point (x1,y1)) (Point (x2,y2)) = Delta (x2 - x1, y2 - y1)
 
 let dragThreshold = 5.0
 
@@ -66,17 +64,17 @@ let processEvent = function
 
     | (Some (_,(PendingGestureType.Tap (_, startPos)))),(Some (id,_,TouchEventType.TouchUp endPos)) 
         when distance startPos endPos >= dragThreshold ->
-            [Gesture(id,TouchUp endPos); Gesture(id,Drag (subtract startPos endPos))]
+            [Gesture(id,TouchUp endPos); Gesture(id,Drag (startPos,(subtract startPos endPos)))]
 
     | (Some (_,(PendingGestureType.Tap (_, startPos)))),(Some (id,_,TouchMoved endPos)) 
         when distance startPos endPos >= dragThreshold ->
-            [Gesture(id,Drag (subtract startPos endPos)); PendingGesture(id, PendingGestureType.Drag (endPos))]
+            [Gesture(id,Drag (startPos,(subtract startPos endPos))); PendingGesture(id, PendingGestureType.Drag (endPos))]
 
     | (Some (_,(PendingGestureType.Drag startPos))),(Some (id,_,TouchMoved endPos)) ->
-        [Gesture(id,Drag (subtract startPos endPos)); PendingGesture(id, PendingGestureType.Drag (endPos))]
+        [Gesture(id,Drag (startPos,(subtract startPos endPos))); PendingGesture(id, PendingGestureType.Drag (endPos))]
 
     | (Some (_,(PendingGestureType.Drag startPos))),(Some (id,_,TouchEventType.TouchUp endPos)) ->
-        [Gesture(id,Drag (subtract startPos endPos)); PendingGesture(id, PendingGestureType.Drag (endPos))]
+        [Gesture(id,Drag (startPos,(subtract startPos endPos))); PendingGesture(id, PendingGestureType.Drag (endPos))]
 
     | _,(Some (id,_,TouchEventType.TouchUp pos)) -> [Gesture(id,TouchUp pos)]
 
