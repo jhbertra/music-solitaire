@@ -1,10 +1,8 @@
 module Engine
 
 open Core
-open View
-open Model
 open Update
-open View
+open Draw
 
 let engine (rng : System.Random) = {
     contentManifest = contentManifest

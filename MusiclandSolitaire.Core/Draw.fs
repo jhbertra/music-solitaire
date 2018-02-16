@@ -1,4 +1,4 @@
-﻿module View
+﻿module Draw
 
 open Core
 open Model
@@ -84,45 +84,36 @@ let tableau5Position = 434.0,223.0
 let tableau6Position = 536.0,223.0
 let tableau7Position = 638.0,223.0
 
-let withinBox (x,y) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
+let withinBox (Point (x,y)) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
 
-let handleTouchUp position id =
+let handleTouchUp id position =
     let isPositionWithinBox = withinBox position 86.0 115.0
     if isPositionWithinBox heartsFoundationPosition then
-        Msg (CommitMove (HeartsFoundation,id))
+        CommitMove (Pile HeartsFoundation,id)
     else if isPositionWithinBox spadesFoundationPosition then
-        Msg (CommitMove (SpadesFoundation,id))
+        CommitMove (Pile SpadesFoundation,id)
     else if isPositionWithinBox diamondsFoundationPosition then
-        Msg (CommitMove (DiamondsFoundation,id))
+        CommitMove (Pile DiamondsFoundation,id)
     else if isPositionWithinBox clubsFoundationPosition then
-        Msg (CommitMove (ClubsFoundation,id))
-    else if isPositionWithinBox tableau1Position then
-        Msg (CommitMove (Tableau1,id))
-    else if isPositionWithinBox tableau2Position then
-        Msg (CommitMove (Tableau2,id))
-    else if isPositionWithinBox tableau3Position then
-        Msg (CommitMove (Tableau3,id))
-    else if isPositionWithinBox tableau4Position then
-        Msg (CommitMove (Tableau4,id))
-    else if isPositionWithinBox tableau5Position then
-        Msg (CommitMove (Tableau5,id))
-    else if isPositionWithinBox tableau6Position then
-        Msg (CommitMove (Tableau6,id))
-    else if isPositionWithinBox tableau7Position then
-        Msg (CommitMove (Tableau7,id))
+        CommitMove (Pile ClubsFoundation,id)
     else
-        Msg (TouchDropped id)
+        CancelMove id
 
-let background : Sprite<Msg> = {
-    textures = ["Table"]
-    position = 0.0,0.0
-    touchDown = None
-    touchMoved = (Some (fun pos id -> Msg (Move (pos,id))))
-    touchUp = (Some handleTouchUp)
-    tapped = None
-    alpha = 1.0
-}
-
+let background =
+    Sprite 
+      ( ["Table"]
+      , (Point (0.0, 0.0))
+      , 1.0, 
+        {
+        tapHandler = None
+        touchDownHandler = None
+        touchUpHandler = Some handleTouchUp
+        dragHandler = Some (fun id _ delta -> Move (id, delta))
+        stopTouchPropagation = true
+        overlapHandler = None
+        }
+      )
+(*
 let drawPile pile getTextures position touchDown touchMoved touchUp tapped =
     match pile with
     | [] -> []
@@ -225,14 +216,14 @@ let moving model =
             (fun _ _ -> None)
             (fun _ -> None)
             (fun _ _ -> None)
-        
+        *)
 
-let view model =
-    background
-    :: {textures = ["Reset"]; position = (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)); touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> (fun _ -> Msg FlipStock))); tapped = None; alpha = 0.5}
+let draw model =
+    [background]
+    (*:: {textures = ["Reset"]; position = (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)); touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> (fun _ -> Msg FlipStock))); tapped = None; alpha = 0.5}
     :: stock model
     @ talon model
     @ foundations model
     @ tableaus model
     @ moving model
-    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> (fun _ -> Msg Reset))); tapped = None; alpha = 1.0}]
+    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> (fun _ -> Msg Reset))); tapped = None; alpha = 1.0}]*)

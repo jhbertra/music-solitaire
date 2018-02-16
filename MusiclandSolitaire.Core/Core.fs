@@ -45,28 +45,35 @@ let runState initial state = match state with State f -> f initial
 
 type StateBuilder() =
 
-    member inline this.Return(x) = State (fun s -> x,s)
+    member this.Zero () = State(fun s -> (), s)
 
-    member inline this.ReturnFrom(m) = m
+    member this.Return x = State(fun s -> x, s)
 
+    member inline this.ReturnFrom (x) = x
+
+    member this.Bind (x, f) =
+        State(fun state ->
+            let (result: 'a), state = runState state x
+            runState state (f result))
+    
+    member this.Combine (x1, x2) =
+        State(fun state ->
+            let result, state = runState state x1
+            runState state x2)
+    
     member this.Delay f = f ()
 
-    member inline this.Bind(m, f) = 
-        State (fun s ->
-            let (v, newState) = runState s m
-            runState newState (f v))
-
-    member this.Combine (x1, x2) =
-            State(fun state ->
-                let result, state = runState state x1
-                runState state x2)
-
     member this.For (seq, f) =
+        if Seq.length seq = 0 then
+            this.Zero ()
+        else
             seq
             |> Seq.map f
             |> Seq.reduceBack (fun x1 x2 -> this.Combine (x1, x2))
-
-    member inline this.Zero() = State(fun s -> (),s)
+    
+    member this.While (f, x) =
+        if f () then this.Combine (x, this.While (f, x))
+        else this.Zero ()
 
 let state = StateBuilder()
 

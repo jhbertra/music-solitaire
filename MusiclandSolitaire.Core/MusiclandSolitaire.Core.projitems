@@ -13,5 +13,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Touch.fs" />
     <Compile Include="$(MSBuildThisFileDirectory)Model.fs" />
     <Compile Include="$(MSBuildThisFileDirectory)Update.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Draw.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Engine.fs" />
   </ItemGroup>
 </Project>

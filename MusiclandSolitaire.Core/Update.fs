@@ -33,8 +33,8 @@ let getSuitContent suit =
 type Msg =
     | PreparePop
     | PopStock
-    | BeginMove of MoveOrigin * int * (float * float)*int
-    | Move of (float * float) * int
+    | BeginMove of MoveOrigin * int * Point * int
+    | Move of int * Delta
     | CancelMove of int
     | CommitMove of MoveOrigin * int
     | MoveCommitted
@@ -229,6 +229,7 @@ let rec processMessage msg model =
     if model.won && msg <> Reset then
         returnModel model
     else
+        printfn "Msg %A" msg
         match msg with
 
         | Reset -> initModel model.rng |> returnModel
@@ -281,11 +282,11 @@ let rec processMessage msg model =
                     Msg HandleMovingSound
                 ]
 
-        | Move ((x,y),tid) ->
+        | Move (tid, Delta (x,y)) ->
             match model.moving with
-            | Some (origin,cards,(oldX, oldY),s,id) when id = tid ->
+            | Some (origin,cards,Point (oldX, oldY),s,id) when id = tid ->
                 { model with
-                    moving = Some (origin,cards,(oldX + x, oldY + y),s,id)
+                    moving = Some (origin,cards,Point (oldX + x, oldY + y),s,id)
                     }
                     ,[]
             | _ -> returnModel model
@@ -356,9 +357,11 @@ let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
     let gestureResults =
         touchEvents gameState.model.previousTouches gameState.touches gameState.gameTime
         |> processEvents gameState.model.pendingGestures
+
     let model = 
         { gameState.model with
             pendingGestures = pendingGestures gestureResults
+            previousTouches = gameState.touches
             }
     messages gameState.objects (gestures gestureResults)
     |> sendMessages processMessage

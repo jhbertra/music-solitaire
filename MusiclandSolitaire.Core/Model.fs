@@ -66,7 +66,7 @@ type MoveOrigin =
     | Pile of Pile
     | Tableau of TableauNumber
 
-type MovingModel = MoveOrigin * Card list * (float * float) * string option * int
+type MovingModel = MoveOrigin * Card list * Point * string option * int
 
 type Model = {
     won : bool
