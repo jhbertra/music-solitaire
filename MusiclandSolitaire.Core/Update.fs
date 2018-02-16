@@ -31,13 +31,12 @@ let getSuitContent suit =
 //
 
 type Msg =
-    | DealCards
     | PreparePop
     | PopStock
-    | BeginMove of Pile * int * (float * float)*int
-    | Move of (float * float)*int
-    | TouchDropped of int
-    | CommitMove of Pile*int
+    | BeginMove of MoveOrigin * int * (float * float)*int
+    | Move of (float * float) * int
+    | CancelMove of int
+    | CommitMove of MoveOrigin * int
     | MoveCommitted
     | Reset
     | CardTapped of Card
@@ -67,36 +66,61 @@ type Operation =
 // --------- Init ---------
 //
 
+let rec deal cards =
+    state {
+        for card in cards do
+            let! tableauDealMoves = gets getTableauDealMoves
+            let! model = gets getModel
+
+            match tableauDealMoves with
+            | [] ->
+                do! model |> pushCardToPile Stock card |> setModel |> modify
+
+            | (tableau, faceUp) :: moves ->
+                do! setTableauDealMoves moves |> modify
+                do! model |> pushCardToTableau tableau faceUp card |> setModel |> modify
+
+        return! gets getModel
+    }
+
 let initModel rng = 
-    {
-    stock = []
-    talon = []
-    tableau1 = []
-    tableau2 = [],[]
-    tableau3 = [],[]
-    tableau4 = [],[]
-    tableau5 = [],[]
-    tableau6 = [],[]
-    tableau7 = [],[]
-    heartsFoundation = []
-    spadesFoundation = []
-    diamondsFoundation = []
-    clubsFoundation = []
-    moving = None
-    rng = rng
-    popReady = false
-    phase = DealPhase 
-        {
-        deck = 
-            [for suit in suits do for face in faces do yield suit,face]
-            |> Array.ofList
-            |> shuffleArr rng
-            |> List.ofArray
+
+    let model = {
+        won = false
+        stock = initPile
+        talon = initPile
+        tableau1 = initTableau
+        tableau2 = initTableau
+        tableau3 = initTableau
+        tableau4 = initTableau
+        tableau5 = initTableau
+        tableau6 = initTableau
+        tableau7 = initTableau
+        heartsFoundation = initPile
+        spadesFoundation = initPile
+        diamondsFoundation = initPile
+        clubsFoundation = initPile
+        moving = None
+        rng = rng
+        popReady = false
+        pendingGestures = []
+        previousTouches = []
+        }
+
+    let deck = 
+        [for suit in suits do for face in faces do yield suit,face]
+        |> Array.ofList
+        |> shuffleArr rng
+        |> List.ofArray
+
+    let dealingState = {
         tableauDealMoves = 
             let numberOrder = [1..7]
-            numberOrder |> List.collect (fun i -> (List.skip (i-1) numberOrder) |> List.mapi (fun j num -> num,j=0))
+            numberOrder |> List.collect (fun i -> (List.skip (i-1) numberOrder) |> List.mapi (fun j num -> tableauNumber num,j=0))
+        model = model
         }
-    }
+
+    evalState dealingState (deal deck)
 
 let pointInBox (Point (x,y)) (BoundingBox (xb,yb,w,h)) =
     let xpb = x - xb
@@ -195,410 +219,138 @@ let rec sendMessages processMessage = function
         return! sendMessages processMessage ((messages nextOperations) @ msgs)
     }
 
-let wrapOperation processMessage = function
-| Msg msg -> fun {model=model} -> sendMessages processMessage [msg] |> evalState (UpdateResult (model,[]))
+let returnModel model = model,[]
+
+let wrapOperation processMessage : Operation -> Update<Model, Tag> = function
+| Msg msg -> fun {model=model} -> sendMessages processMessage [msg] |> evalState (UpdateResult (returnModel model))
 | Cmd cmd -> fun {model=model} -> UpdateResult (model, [cmd])
 
-let updateTableau tableau faceUp card =
-    match tableau with up,down -> if faceUp then card::up,down else up,card::down
-
-let isFace2Higher face1 face2 =
-    face1 = KeySignature && face2 = Do
-    || face1 = Do && face2 = Re
-    || face1 = Re && face2 = Mi
-    || face1 = Mi && face2 = Fa
-    || face1 = Fa && face2 = So
-    || face1 = So && face2 = La
-    || face1 = La && face2 = Ti
-    || face1 = Ti && face2 = Do8
-    || face1 = Do8 && face2 = IV
-    || face1 = IV && face2 = V
-    || face1 = V && face2 = I
-
-let areAlternateSuits suit1 suit2 =
-    match suit1 with
-    | Hearts | Diamonds -> suit2 = Clubs || suit2 = Spades
-    | _ -> suit2 = Hearts || suit2 = Diamonds
-
-let canPlaceOnFoundation foundation requiredSuit card =
-    match foundation,card with
-    | [],(suit,KeySignature) -> suit = requiredSuit
-    | (_,targetFace)::_,(suit,face) -> isFace2Higher targetFace face && suit = requiredSuit
-    | _ -> false
-
-let canPlaceOnTableau tableau cards =
-    match tableau,(List.rev cards) with
-    | [],((_,I) :: _) -> true
-    | ((targetSuit, targetFace) :: _),((suit,face) :: _) -> 
-        isFace2Higher face targetFace && areAlternateSuits targetSuit suit 
-    | _ -> false
-
-let replenish destAndSource =
-    match destAndSource with
-    | [],(head :: tail) -> [head],tail
-    | _ -> destAndSource
-
 let rec processMessage msg model =
-    match model.phase,msg with
+    if model.won && msg <> Reset then
+        returnModel model
+    else
+        match msg with
 
-    // Dealing
+        | Reset -> initModel model.rng |> returnModel
 
-    | (DealPhase dealModel),DealCards -> 
-        match dealModel.deck with
-        | [] -> { model with phase = PlayingPhase },[]
-        | card :: remainingDeck -> 
-            match dealModel.tableauDealMoves with
-            | move :: remainingMoves -> 
-                match move with
-                | 1,_ -> { model with tableau1 = [card]; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
-                | 2,faceUp -> { model with tableau2 = updateTableau model.tableau2 faceUp card; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
-                | 3,faceUp -> { model with tableau3 = updateTableau model.tableau3 faceUp card; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
-                | 4,faceUp -> { model with tableau4 = updateTableau model.tableau4 faceUp card; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
-                | 5,faceUp -> { model with tableau5 = updateTableau model.tableau5 faceUp card; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
-                | 6,faceUp -> { model with tableau6 = updateTableau model.tableau6 faceUp card; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
-                | 7,faceUp -> { model with tableau7 = updateTableau model.tableau7 faceUp card; phase = DealPhase { deck = remainingDeck; tableauDealMoves = remainingMoves } }
-                | _ -> model
-            | [] -> { model with stock = card :: model.stock; phase = DealPhase { deck = remainingDeck; tableauDealMoves = [] } }
-            ,[Msg DealCards]
+        | PreparePop -> returnModel { model with popReady = true }
 
-    | (DealPhase _),_ -> model,[]        
+        | PopStock ->
+            match (model.popReady),(model.stock) with
+            | false,_ -> model
+            | true,[] -> model
+            | true,(head::tail) -> 
+                { model with
+                    stock = tail
+                    talon = head :: model.talon
+                    popReady = false
+                }
+            |> returnModel
 
-    // Playing
+        | BeginMove (origin, count, pos, id) ->
+            let pileSound = List.head >> snd >> getFaceContent >> Some
+            let tableauSound = (fun n -> List.take n >> List.last >> snd >> getFaceContent >> Some)
+            let susSound = Option.map (fun s -> s + "_Sus")
+            
+            let cardsInPile, pickCards, sound, moving =
+                match model.moving,origin,count with
+                | None, Pile pile, 1 when pile <> Stock ->
+                    let cardsInPile = getPile pile model
+                    let pickCards = flip (setPile pile)
+                    let sound = pileSound cardsInPile
+                    cardsInPile, pickCards, sound, Some (origin,(List.take 1 cardsInPile),pos,susSound sound, id) 
 
-    | PlayingPhase,PreparePop -> 
-        { model with
-            popReady = true
-            }
-            ,[]
+                | None, Tableau tableau, n when n <= (getTableau tableau model |> faceUp |> List.length) && n > 0 ->
+                    let cardsInTableau = getTableau tableau model |> faceUp
+                    let pickCards = setTableauFaceUp tableau
+                    let sound = tableauSound n cardsInTableau
+                    cardsInTableau, pickCards, sound, Some (origin,(List.take 1 cardsInTableau),pos,susSound sound, id) 
 
-    | PlayingPhase,PopStock -> 
-        match (model.popReady),(model.stock) with
-        | false,_ -> model,[]
-        | true,[] -> model,[]
-        | true,(head::tail) -> 
-            { model with
-                stock = tail
-                talon = head :: model.talon
-                popReady = false
-            }
-            ,[]
+                | _ -> [], idFunc2, None, None
 
-    | PlayingPhase,(BeginMove (origin, count, pos, id)) ->
-        let pileSound = List.head >> snd >> getFaceContent >> Some
-        let tableauSound = (fun n -> fst >> List.take n >> List.last >> snd >> getFaceContent >> Some)
-        let susSound = Option.map (fun s -> s + "_Sus")
-        let newModel,sound =
-            match model.moving,origin,count with
-            | None,Talon,1 when not (List.isEmpty model.talon) ->
-                let sound = pileSound model.talon
-                { model with
-                    talon = List.skip 1 model.talon
-                    moving = Some (origin,(List.take 1 model.talon),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,HeartsFoundation,1 when not (List.isEmpty model.heartsFoundation) ->
-                let sound = pileSound model.heartsFoundation
-                { model with
-                    heartsFoundation = List.skip 1 model.heartsFoundation
-                    moving = Some (origin,(List.take 1 model.heartsFoundation),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,SpadesFoundation,1 when not (List.isEmpty model.spadesFoundation) ->
-                let sound = pileSound model.spadesFoundation
-                { model with
-                    spadesFoundation = List.skip 1 model.spadesFoundation
-                    moving = Some (origin,(List.take 1 model.spadesFoundation),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,DiamondsFoundation,1 when not (List.isEmpty model.diamondsFoundation) ->
-                let sound = pileSound model.diamondsFoundation
-                { model with
-                    diamondsFoundation = List.skip 1 model.diamondsFoundation
-                    moving = Some (origin,(List.take 1 model.diamondsFoundation),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,ClubsFoundation,1 when not (List.isEmpty model.clubsFoundation) ->
-                let sound = pileSound model.clubsFoundation
-                { model with
-                    clubsFoundation = List.skip 1 model.clubsFoundation
-                    moving = Some (origin,(List.take 1 model.clubsFoundation),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,Tableau1,n when n <= List.length model.tableau1 && n > 0 ->
-                let sound = tableauSound n (model.tableau1,[])
-                { model with
-                    tableau1 = List.skip n model.tableau1
-                    moving = Some (origin,(List.take n model.tableau1),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,Tableau2,n when n <= List.length (fst model.tableau2) && n > 0 ->
-                let sound = tableauSound n model.tableau2
-                { model with
-                    tableau2 = (List.skip n (fst model.tableau2)),(snd model.tableau2)
-                    moving = Some (origin,(List.take n (fst model.tableau2)),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,Tableau3,n when n <= List.length (fst model.tableau3) && n > 0 ->
-                let sound = tableauSound n model.tableau3
-                { model with
-                    tableau3 = (List.skip n (fst model.tableau3)),(snd model.tableau3)
-                    moving = Some (origin,(List.take n (fst model.tableau3)),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,Tableau4,n when n <= List.length (fst model.tableau4) && n > 0 ->
-                let sound = tableauSound n model.tableau4
-                { model with
-                    tableau4 = (List.skip n (fst model.tableau4)),(snd model.tableau4)
-                    moving = Some (origin,(List.take n (fst model.tableau4)),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,Tableau5,n when n <= List.length (fst model.tableau5) && n > 0 ->
-                let sound = tableauSound n model.tableau5
-                { model with
-                    tableau5 = (List.skip n (fst model.tableau5)),(snd model.tableau5)
-                    moving = Some (origin,(List.take n (fst model.tableau5)),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,Tableau6,n when n <= List.length (fst model.tableau6) && n > 0 ->
-                let sound = tableauSound n model.tableau6
-                { model with
-                    tableau6 = (List.skip n (fst model.tableau6)),(snd model.tableau6)
-                    moving = Some (origin,(List.take n (fst model.tableau6)),pos,susSound sound, id)
-                    }
-                    ,sound
-            | None,Tableau7,n when n <= List.length (fst model.tableau7) && n > 0 ->
-                let sound = tableauSound n model.tableau7
-                { model with
-                    tableau7 = (List.skip n (fst model.tableau7)),(snd model.tableau7)
-                    moving = Some (origin,(List.take n (fst model.tableau7)),pos,susSound sound, id)
-                    }
-                    ,sound
-            | _ -> model,None
-        match newModel,sound with
-        | model,None -> model,[]
-        | model,(Some sound) -> 
-            model,
-            [
-                Cmd (PlaySound (sound, NoOverlap, 1.0))
-                Cmd (PlaySound (sound + "_Sus",SoundMode.Overlap,0.5))
-                Cmd (Delay (1.0, wrapOperation processMessage (Msg HandleMovingSound)))
-                Msg HandleMovingSound
-            ]
+            let model = { pickCards model (List.skip count cardsInPile) with moving = moving }
 
-    | PlayingPhase,(Move ((x,y),tid)) ->
-        match model.moving with
-        | Some (pile,cards,(oldX, oldY),s,id) when id = tid ->
-            { model with
-                moving = Some (pile,cards,(oldX + x, oldY + y),s,id)
-                }
-                ,[]
-        | _ -> model,[]
-    | PlayingPhase,TouchDropped tid ->
-        match model.moving with
-        | Some (Talon,cards,_,_,id) when id = tid -> 
-            { model with
-                talon = cards @ model.talon
-                moving = None
-                }
-                ,[]
-        | Some (HeartsFoundation,cards,_,_,id) when id = tid -> 
-            { model with
-                heartsFoundation = cards @ model.heartsFoundation
-                moving = None
-                }
-                ,[]
-        | Some (SpadesFoundation,cards,_,_,id) when id = tid -> 
-            { model with
-                spadesFoundation = cards @ model.spadesFoundation
-                moving = None
-                }
-                ,[]
-        | Some (DiamondsFoundation,cards,_,_,id) when id = tid -> 
-            { model with
-                diamondsFoundation = cards @ model.diamondsFoundation
-                moving = None
-                }
-                ,[]
-        | Some (ClubsFoundation,cards,_,_,id) when id = tid -> 
-            { model with
-                clubsFoundation = cards @ model.clubsFoundation
-                moving = None
-                }
-                ,[]
-        | Some (Tableau1,cards,_,_,id) when id = tid -> 
-            { model with
-                tableau1 = cards @ model.tableau1
-                moving = None
-                }
-                ,[]
-        | Some (Tableau2,cards,_,_,id) when id = tid -> 
-            { model with
-                tableau2 = (cards @ (fst model.tableau2),(snd model.tableau2))
-                moving = None
-                }
-                ,[]
-        | Some (Tableau3,cards,_,_,id) when id = tid -> 
-            { model with
-                tableau3 = (cards @ (fst model.tableau3),(snd model.tableau3))
-                moving = None
-                }
-                ,[]
-        | Some (Tableau4,cards,_,_,id) when id = tid -> 
-            { model with
-                tableau4 = (cards @ (fst model.tableau4),(snd model.tableau4))
-                moving = None
-                }
-                ,[]
-        | Some (Tableau5,cards,_,_,id) when id = tid -> 
-            { model with
-                tableau5 = (cards @ (fst model.tableau5),(snd model.tableau5))
-                moving = None
-                }
-                ,[]
-        | Some (Tableau6,cards,_,_,id) when id = tid -> 
-            { model with
-                tableau6 = (cards @ (fst model.tableau6),(snd model.tableau6))
-                moving = None
-                }
-                ,[]
-        | Some (Tableau7,cards,_,_,id) when id = tid -> 
-            { model with
-                tableau7 = (cards @ (fst model.tableau7),(snd model.tableau7))
-                moving = None
-                }
-                ,[]
-        | _ -> model,[]
-
-    | PlayingPhase,(CommitMove (target,tid)) ->
-        match model.moving with
-        | Some (_,cards,_,_,id) when tid = id ->
-            match cards,target with
-            | [card],HeartsFoundation when canPlaceOnFoundation model.heartsFoundation Hearts card ->
-                { model with
-                    heartsFoundation = card :: model.heartsFoundation
-                    moving = None
-                    },
-                    [ 
-                        Cmd (PlaySound ((getFaceContent (snd card)),NoOverlap,1.0))
-                        Msg MoveCommitted
-                    ]
-            | [card],SpadesFoundation when canPlaceOnFoundation model.spadesFoundation Spades card ->
-                { model with
-                    spadesFoundation = card :: model.spadesFoundation
-                    moving = None
-                    },
-                    [ 
-                        Cmd (PlaySound ((getFaceContent (snd card)),NoOverlap,1.0))
-                        Msg MoveCommitted
-                    ]
-            | [card],DiamondsFoundation when canPlaceOnFoundation model.diamondsFoundation Diamonds card ->
-                { model with
-                    diamondsFoundation = card :: model.diamondsFoundation
-                    moving = None
-                    },
-                    [ 
-                        Cmd (PlaySound ((getFaceContent (snd card)),NoOverlap,1.0))
-                        Msg MoveCommitted
-                    ]
-            | [card],ClubsFoundation when canPlaceOnFoundation model.clubsFoundation Clubs card ->
-                { model with
-                    clubsFoundation = card :: model.clubsFoundation
-                    moving = None
-                    },
-                    [ 
-                        Cmd (PlaySound ((getFaceContent (snd card)),NoOverlap,1.0))
-                        Msg MoveCommitted
-                    ]
-            | cards,Tableau1 when canPlaceOnTableau model.tableau1 cards ->
-                { model with
-                    tableau1 = cards @ model.tableau1
-                    moving = None
-                    }
-                    ,[Msg MoveCommitted]
-            | cards,Tableau2 when canPlaceOnTableau (fst model.tableau2) cards ->
-                { model with
-                    tableau2 = (cards @ (fst model.tableau2)),(snd model.tableau2)
-                    moving = None
-                    }
-                    ,[Msg MoveCommitted]
-            | cards,Tableau3 when canPlaceOnTableau (fst model.tableau3) cards ->
-                { model with
-                    tableau3 = (cards @ (fst model.tableau3)),(snd model.tableau3)
-                    moving = None
-                    }
-                    ,[Msg MoveCommitted]
-            | cards,Tableau4 when canPlaceOnTableau (fst model.tableau4) cards ->
-                { model with
-                    tableau4 = (cards @ (fst model.tableau4)),(snd model.tableau4)
-                    moving = None
-                    }
-                    ,[Msg MoveCommitted]
-            | cards,Tableau5 when canPlaceOnTableau (fst model.tableau5) cards ->
-                { model with
-                    tableau5 = (cards @ (fst model.tableau5)),(snd model.tableau5)
-                    moving = None
-                    }
-                    ,[Msg MoveCommitted]
-            | cards,Tableau6 when canPlaceOnTableau (fst model.tableau6) cards ->
-                { model with
-                    tableau6 = (cards @ (fst model.tableau6)),(snd model.tableau6)
-                    moving = None
-                    }
-                    ,[Msg MoveCommitted]
-            | cards,Tableau7 when canPlaceOnTableau (fst model.tableau7) cards ->
-                { model with
-                    tableau7 = (cards @ (fst model.tableau7)),(snd model.tableau7)
-                    moving = None
-                    }
-                    ,[Msg MoveCommitted]
-            | _ -> model,[Msg (TouchDropped id)]
-        | _ -> model,[]
-
-    | PlayingPhase,MoveCommitted ->
-        if [model.heartsFoundation;model.spadesFoundation;model.diamondsFoundation;model.clubsFoundation] |> List.map List.length = [12;12;12;12]
-        then
-            { model with
-                phase = WonPhase
-                }
-                ,[Cmd (Delay (1.0,wrapOperation processMessage (Cmd (PlaySound ("Stack",NoOverlap,1.0)))))]
-        else 
-            { model with
-                tableau2 = replenish model.tableau2
-                tableau3 = replenish model.tableau3
-                tableau4 = replenish model.tableau4
-                tableau5 = replenish model.tableau5
-                tableau6 = replenish model.tableau6
-                tableau7 = replenish model.tableau7
-                }
-                ,[]            
-
-    | PlayingPhase,DealCards -> model,[]
-
-    | PlayingPhase,(CardTapped (_,face)) -> model,[Cmd (PlaySound (getFaceContent face,NoOverlap,1.0))]
-
-    | PlayingPhase,FlipStock -> 
-        { model with
-            talon = []
-            stock = List.rev model.talon 
-            }
-            ,[]
-
-    | PlayingPhase,HandleMovingSound ->
-        match model.moving with
-        | Some (_,_,_,Some sound,_) -> 
-            model,
+            match sound with
+            | None -> returnModel model
+            | (Some sound) -> 
+                model,
                 [
-                Cmd (Delay (1.0,wrapOperation processMessage (Msg HandleMovingSound)))
-                Cmd (PlaySound (sound,SoundMode.Overlap,0.5))
+                    Cmd (PlaySound (sound, NoOverlap, 1.0))
+                    Cmd (PlaySound (sound + "_Sus",SoundMode.Overlap,0.5))
+                    Cmd (Delay (1.0, wrapOperation processMessage (Msg HandleMovingSound)))
+                    Msg HandleMovingSound
                 ]
-        | _ -> model,[]
 
-    // Game End
+        | Move ((x,y),tid) ->
+            match model.moving with
+            | Some (origin,cards,(oldX, oldY),s,id) when id = tid ->
+                { model with
+                    moving = Some (origin,cards,(oldX + x, oldY + y),s,id)
+                    }
+                    ,[]
+            | _ -> returnModel model
 
+        | CancelMove tid ->
+            let returnCardsToOrigin =
+                match model.moving with
+                | Some (Pile pile,cards,_,_,id) when id = tid -> modifyPile pile ((@) cards)
+                | Some (Tableau tableau,cards,_,_,id) when id = tid -> modifyTableauFaceUp tableau ((@) cards)
+                | _ -> idFunc
 
-    | _,Reset -> initModel model.rng,[]
+            returnModel { returnCardsToOrigin model with moving = None}
 
-    | WonPhase,_ -> model,[]
+        | CommitMove (target,tid) ->
+            match model.moving with
+            | Some (_,cards,_,_,id) when tid = id ->
+
+                match cards,target with
+                | _,Pile Stock | _,Pile Talon -> returnModel model
+
+                | [card],Pile pile when canPlaceOnFoundation (getPile pile model) (getSuit pile) card ->
+                    { pushCardToPile pile card model with moving = None },
+                        [ 
+                            Cmd (PlaySound ((getFaceContent (snd card)),NoOverlap,1.0))
+                            Msg MoveCommitted
+                        ]
+                        
+                | cards,Tableau tableau when canPlaceOnTableau (getTableau tableau model |> faceUp) cards ->
+                    { modifyTableauFaceUp tableau ((@) cards) model with moving = None }, [Msg MoveCommitted]
+
+                | _ -> model,[Msg (CancelMove id)]
+                
+            | _ -> returnModel model
+
+        | MoveCommitted ->
+            if [model.heartsFoundation;model.spadesFoundation;model.diamondsFoundation;model.clubsFoundation] |> List.map List.length = [12;12;12;12]
+            then
+                { model with won = true }, [Cmd (Delay (1.0,wrapOperation processMessage (Cmd (PlaySound ("Stack",NoOverlap,1.0)))))]
+            else 
+                model
+                |> modifyTableau Tableau2 replenish
+                |> modifyTableau Tableau3 replenish
+                |> modifyTableau Tableau4 replenish
+                |> modifyTableau Tableau5 replenish
+                |> modifyTableau Tableau6 replenish
+                |> modifyTableau Tableau7 replenish
+                |> returnModel
+
+        | CardTapped (_,face) -> model,[Cmd (PlaySound (getFaceContent face,NoOverlap,1.0))]
+
+        | FlipStock -> 
+            model
+            |> setPile Talon []
+            |> setPile Stock (List.rev model.talon)
+            |> returnModel
+
+        | HandleMovingSound ->
+            match model.moving with
+            | Some (_,_,_,Some sound,_) -> 
+                model,
+                    [
+                    Cmd (Delay (1.0,wrapOperation processMessage (Msg HandleMovingSound)))
+                    Cmd (PlaySound (sound,SoundMode.Overlap,0.5))
+                    ]
+            | _ -> returnModel model
 
 let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
     let gestureResults =
@@ -610,4 +362,4 @@ let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
             }
     messages gameState.objects (gestures gestureResults)
     |> sendMessages processMessage
-    |> evalState (UpdateResult (model,[]))
+    |> evalState (UpdateResult (returnModel model))

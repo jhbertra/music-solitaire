@@ -235,3 +235,11 @@ let fullJoin list1 list2 key1Selector key2Selector =
         @ (list2MissingKeys |> List.map (fun i -> i,None))
         |> List.sortBy fst
     List.zip list1Full list2Full |> List.map (bimapT2 snd snd)
+
+let applyT2 f arg1 arg2 = f (arg1, arg2)
+
+let flip f a1 a2 = f a2 a1
+
+let idFunc x = x
+
+let idFunc2 x _ = x
