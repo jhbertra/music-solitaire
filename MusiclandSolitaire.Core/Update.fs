@@ -50,7 +50,7 @@ type Tag = {
     tapHandler : (int -> Point -> Msg) option
     touchDownHandler : (int -> Point -> Msg) option
     touchUpHandler : (int -> Point -> Msg) option
-    dragHandler : (int -> Point -> Delta -> Msg) option
+    dragHandler : (int -> Delta -> Point -> Msg) option
     stopTouchPropagation : bool
     overlapHandler : (Overlap -> Msg) option
 }
@@ -134,37 +134,27 @@ let rec messagesFromGesture objects (id,gestureType) =
     match objects with
     | [] -> []
     | {tag = tag; box = box}::os ->
-        let messages =
+        let handler,hitPos =
             match gestureType with
-            | GestureType.Tap pos ->
-                optional {
-                    let! handler = tag.tapHandler
-                    let! pointInBox = pointInBox pos box
-                    return handler id pointInBox
-                }
-            | GestureType.TouchDown pos ->
-                optional {
-                    let! handler = tag.touchDownHandler
-                    let! pointInBox = pointInBox pos box
-                    return handler id pointInBox
-                }
-            | GestureType.TouchUp pos ->
-                optional {
-                    let! handler = tag.touchUpHandler
-                    let! pointInBox = pointInBox pos box
-                    return handler id pointInBox
-                }
-            | GestureType.Drag (startPos,delta) ->
-                optional {
-                    let! handler = tag.dragHandler
-                    let! pointInBox = pointInBox startPos box
-                    return handler id pointInBox delta
-                }
-            |> optionToSingletonList
-        if tag.stopTouchPropagation then
-            messages
-        else
-            messages @ messagesFromGesture os (id,gestureType)
+            | GestureType.Tap pos -> tag.tapHandler <?> id, pos
+            | GestureType.TouchDown pos -> tag.touchDownHandler <?> id, pos
+            | GestureType.TouchUp pos -> tag.touchUpHandler <?> id, pos
+            | GestureType.Drag (startPos,delta) -> tag.dragHandler <?> id <?> delta, startPos
+        
+        let result =
+            optional {
+                let! handler = handler
+                let! pointInBox = pointInBox hitPos box
+                return handler pointInBox
+            }
+
+        match result with
+        | None -> messagesFromGesture os (id,gestureType)
+        | Some message ->
+            if tag.stopTouchPropagation then
+                [message]
+            else
+                message :: messagesFromGesture os (id,gestureType)
 
 let rec overlaps box = function
 | [] -> []
@@ -363,6 +353,6 @@ let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
             pendingGestures = pendingGestures gestureResults
             previousTouches = gameState.touches
             }
-    messages gameState.objects (gestures gestureResults)
+    messages (List.rev gameState.objects) (gestures gestureResults)
     |> sendMessages processMessage
     |> evalState (UpdateResult (returnModel model))

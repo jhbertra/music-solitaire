@@ -35,6 +35,8 @@ let mapOption f option =
     | None -> None
     | Some value -> Some (f value)
 
+let (<?>) f arg = mapOption (fun f -> f arg) f
+
 //
 // --------- State ---------
 //

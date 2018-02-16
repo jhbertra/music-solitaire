@@ -108,7 +108,22 @@ let background =
         tapHandler = None
         touchDownHandler = None
         touchUpHandler = Some handleTouchUp
-        dragHandler = Some (fun id _ delta -> Move (id, delta))
+        dragHandler = Some (fun id delta _ -> Move (id, delta))
+        stopTouchPropagation = true
+        overlapHandler = None
+        }
+      )
+
+let flipTalon =
+    Sprite
+      ( ["Reset"]
+      , (Point (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)))
+      , 0.5, 
+        {
+        tapHandler = (Some (fun _ _ -> FlipTalon))
+        touchDownHandler = None
+        touchUpHandler = None
+        dragHandler = None
         stopTouchPropagation = true
         overlapHandler = None
         }
@@ -219,9 +234,9 @@ let moving model =
         *)
 
 let draw model =
-    [background]
-    (*:: {textures = ["Reset"]; position = (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)); touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> (fun _ -> Msg FlipStock))); tapped = None; alpha = 0.5}
-    :: stock model
+    background
+    :: [flipTalon]
+    (* :: stock model
     @ talon model
     @ foundations model
     @ tableaus model

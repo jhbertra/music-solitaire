@@ -10,8 +10,9 @@ type Event<'m, 't> = TimerEnd of Update<'m, 't>
 
 let vector2ToFloatTuple (vec : Microsoft.Xna.Framework.Vector2) = ((float)vec.X,(float)vec.Y)
     
+let scale = 750.0 / float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width // temporary hard-coded scaling
+
 let getTouches (touchCol: TouchCollection) =
-    let scale = 750.0 / float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width // temporary hard-coded scaling
     touchCol
     |> List.ofSeq
     |> List.map (fun touch -> 
@@ -21,7 +22,6 @@ type Game<'m, 't>(engine : GameEngine<'m, 't>) as this =
     inherit Microsoft.Xna.Framework.Game()
 
     let _ = new Microsoft.Xna.Framework.GraphicsDeviceManager(this)
-    let scale = float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width / 750.0 // temporary hard-coded scaling
     let events = System.Collections.Concurrent.ConcurrentQueue<Event<'m, 't>>()
 
     [<DefaultValue>] val mutable model : 'm
@@ -74,7 +74,7 @@ type Game<'m, 't>(engine : GameEngine<'m, 't>) as this =
     let findTexture t = Map.find t this.textures
 
     let rec makeBox (findTexture : string -> Texture2D) (Point (x,y)) = function
-        | [] -> BoundingBox (x, x, 0.0, 0.0)
+        | [] -> BoundingBox (x, y, 0.0, 0.0)
         | t::ts ->
             let texture = findTexture t
             let tBox = BoundingBox (x, y, float texture.Width, float texture.Height)
