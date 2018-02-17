@@ -86,32 +86,7 @@ let tableau7Position = 638.0,223.0
 
 let withinBox (Point (x,y)) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
 
-let handleTouchUp id position =
-    let isPositionWithinBox = withinBox position 86.0 115.0
-    if isPositionWithinBox heartsFoundationPosition then
-        CommitMove (Pile HeartsFoundation,id)
-    else if isPositionWithinBox spadesFoundationPosition then
-        CommitMove (Pile SpadesFoundation,id)
-    else if isPositionWithinBox diamondsFoundationPosition then
-        CommitMove (Pile DiamondsFoundation,id)
-    else if isPositionWithinBox clubsFoundationPosition then
-        CommitMove (Pile ClubsFoundation,id)
-    else if isPositionWithinBox tableau1Position then
-        CommitMove (Tableau Tableau1,id)
-    else if isPositionWithinBox tableau2Position then
-        CommitMove (Tableau Tableau2,id)
-    else if isPositionWithinBox tableau3Position then
-        CommitMove (Tableau Tableau3,id)
-    else if isPositionWithinBox tableau4Position then
-        CommitMove (Tableau Tableau4,id)
-    else if isPositionWithinBox tableau5Position then
-        CommitMove (Tableau Tableau5,id)
-    else if isPositionWithinBox tableau6Position then
-        CommitMove (Tableau Tableau6,id)
-    else if isPositionWithinBox tableau7Position then
-        CommitMove (Tableau Tableau7,id)
-    else
-        CancelMove id
+let handleTouchUp id _ = CommitMove id
 
 let handler msg = Some (fun _ _ -> msg)
 
@@ -209,7 +184,7 @@ let faceUpPile cards pile position =
         position
         (Some (fun id _ -> BeginMove (Pile pile,1,position,id)))
         None
-        (Some (fun id _ -> CommitMove (Pile pile,id)))
+        (Some (fun id _ -> CommitMove id))
         (Some (fun suit face -> handler (CardTapped ((suit,face)))))
 
 let talon model =
@@ -224,24 +199,41 @@ let foundations model =
     @ faceUpPile model.diamondsFoundation DiamondsFoundation (Point diamondsFoundationPosition)
     @ faceUpPile model.clubsFoundation ClubsFoundation (Point clubsFoundationPosition)
 
-let rec drawFannedPile pile getTextures position dragged touchUp tapped =
+let drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y) =
+    Sprite
+      ( getTextures suit face
+      , Point (x,y)
+      , 1.0
+      , {
+        id = TagId.Card (suit, face)
+        tapHandler = tapped face suit
+        touchDownHandler = None
+        touchUpHandler = touchUp pile
+        dragHandler = dragged pile (Point (x,y))
+        stopTouchPropagation = true
+        overlapHandler = None
+        }
+      ) 
+
+let movingOverlap movingFace = function
+| Overlap ({id = TagId.Target ((_,face), target)},box) when area box > 4000.0 ->
+    StageMove ( face, target ) |> Some
+
+| Overlap ({id = TagId.Target _},_) ->
+    Some UnstageMove
+
+| _ -> None
+
+
+let rec drawFannedPile pile getTextures position dragged touchUp tapped topArea =
     match pile,position with
     | [],_ -> []
-    | ((suit, face) :: tail),Point (x,y) ->
-        Sprite
-          ( getTextures suit face
-          , Point (x,y)
-          , 1.0
-          , {
-            id = TagId.Card (suit, face)
-            tapHandler = tapped face suit
-            touchDownHandler = None
-            touchUpHandler = touchUp pile
-            dragHandler = dragged pile position
-            stopTouchPropagation = true
-            overlapHandler = None
-            }
-          ) :: (drawFannedPile tail getTextures (Point (x,y+32.0)) dragged touchUp tapped)
+    | ((suit, face) :: []),Point (x,y) -> 
+        drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y)
+        :: topArea ( Point ( x, y ) ) suit face
+    | ((suit, face) :: tail),Point (x,y) -> 
+        drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y)
+        :: drawFannedPile tail getTextures (Point (x,y+32.0)) dragged touchUp tapped topArea
 
 let tableau tableau (x,y) model =
     let (Tableau.Tableau (up, down)) = getTableau tableau model
@@ -252,13 +244,30 @@ let tableau tableau (x,y) model =
         (fun _ _ -> None)
         (fun _ -> None)
         (fun _ _ -> None)
+        (fun _ _ _ -> [])
     @ drawFannedPile
         (List.rev up)
         cardFront
         (Point (x,(y + 32.0 * (float)(List.length down))))
         (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun id _ _ -> BeginMove (Tableau tableau,x,pos,id))) | _ -> None)
-        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun id _ -> CommitMove (Tableau tableau,id)) | _ -> None)
+        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun id _ -> CommitMove id) | _ -> None)
         (fun suit face -> (handler (CardTapped (face,suit))))
+        (fun pos suit face -> 
+            [Area 
+              ( "CardBack"
+              , pos
+              , { 
+                id = TagId.Target ( ( suit, face ), Tableau tableau )
+                tapHandler = None
+                touchDownHandler = None
+                touchUpHandler = None
+                dragHandler = None
+                stopTouchPropagation = false
+                overlapHandler = None
+                } 
+              )
+            ] 
+        )
 
 let tableaus model =
     tableau Tableau1 tableau1Position model 
@@ -273,13 +282,28 @@ let moving model =
     match model.moving with
     | None -> []
     | Some (_,cards,position,_,_) ->
-        drawFannedPile
+        let bottom = List.head cards
+        Area 
+          ( "CardBack"
+          , position
+          , { 
+            id = TagId.MovingBottom bottom
+            tapHandler = None
+            touchDownHandler = None
+            touchUpHandler = None
+            dragHandler = None
+            stopTouchPropagation = false
+            overlapHandler = bottom |> fst |> movingOverlap |> Some
+            } 
+          )
+        :: drawFannedPile
             (List.rev cards)
             cardFront
             position
             (fun _ _ -> None)
             (fun _ -> None)
             (fun _ _ -> None)
+            (fun _ _ _ -> [])
 
 let draw model =
     background

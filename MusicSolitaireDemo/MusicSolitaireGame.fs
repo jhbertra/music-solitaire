@@ -81,7 +81,7 @@ type Game<'m, 't>(engine : GameEngine<'m, 't>) as this =
             makeBox findTexture (Point (x,y)) ts |> union tBox
 
     let toGameObject findTexture = function
-        | Area (box, tag) -> { textures = []; box = box; alpha = 1.0; tag = tag }
+        | Area (texture, point, tag) -> { textures = []; box = makeBox findTexture point [texture]; alpha = 1.0; tag = tag }
         | Sprite (textures, point, alpha, tag) -> { textures = textures; box = makeBox findTexture point textures; alpha = alpha; tag = tag }
         
 

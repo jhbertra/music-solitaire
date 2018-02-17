@@ -49,6 +49,7 @@ let initModel rng =
         popReady = false
         pendingGestures = []
         previousTouches = []
+        pendingMove = None
         }
 
     let deck = 
@@ -97,6 +98,8 @@ type TagId =
     | FlipTalon
     | Reset
     | Card of Card
+    | MovingBottom of Card
+    | Target of Card * MoveOrigin
 
 type Msg =
     | PreparePop
@@ -104,7 +107,9 @@ type Msg =
     | BeginMove of MoveOrigin * int * Point * int
     | Move of int * Delta
     | CancelMove of int
-    | CommitMove of MoveOrigin * int
+    | StageMove of Face * MoveOrigin
+    | UnstageMove
+    | CommitMove of int
     | MoveCommitted
     | Reset
     | CardTapped of Card
@@ -118,7 +123,7 @@ type Tag = {
     touchUpHandler : (int -> Point -> Msg) option
     dragHandler : (int -> Delta -> Point -> Msg) option
     stopTouchPropagation : bool
-    overlapHandler : (Overlap -> Msg) option
+    overlapHandler : (Overlap -> Msg option) option
 }
 and Overlap = Overlap of Tag * BoundingBox
 
@@ -166,23 +171,22 @@ let rec messagesFromGesture objects (id,gestureType) =
             else
                 message :: messagesFromGesture os (id,gestureType)
 
-let rec overlaps box = function
-| [] -> []
-| {box = box2; tag = tag} :: os ->
+let rec overlaps id box = function
+| { box = box2; tag = tag2 } :: os when id <> tag2.id ->
     (intersect box box2
-    |> mapOption (fun overlap -> Overlap (tag,overlap))
+    |> mapOption (fun overlap -> Overlap (tag2,overlap))
     |> optionToSingletonList)
-    @ overlaps box os
+    @ overlaps id box os
+| _ -> []
 
 let rec messagesFromObjects = function
 | [] -> []
-| {tag=tag; box=box} :: os ->
-    let overlaps = overlaps box os
-    (optional {
-        let! handler = tag.overlapHandler
-        return overlaps |> List.map handler
-    } |> defaultIfNone [])
-    @ messagesFromObjects os
+| { tag = { id = id; overlapHandler = Some handler }; box = box } :: os ->
+    overlaps id box os
+    |> List.map handler
+    |> values
+    |> List.append (messagesFromObjects os)
+| _ :: os -> messagesFromObjects os
 
 let messages objects gestures = (gestures |> List.collect (messagesFromGesture objects)) @ messagesFromObjects objects
 
@@ -229,12 +233,14 @@ let rec processMessage msg model =
     if model.won && msg <> Reset then
         returnModel model
     else
-        printfn "Msg %A" msg
         match msg with
+
 
         | Reset -> initModel model.rng |> returnModel
 
+
         | PreparePop -> returnModel { model with popReady = true }
+
 
         | PopStock ->
             match (model.popReady),(model.stock) with
@@ -247,6 +253,7 @@ let rec processMessage msg model =
                     popReady = false
                 }
             |> returnModel
+
 
         | BeginMove (origin, count, pos, id) ->
             if model.moving = None then
@@ -274,6 +281,7 @@ let rec processMessage msg model =
 
                 match sound with
                 | None -> returnModel model
+
                 | (Some sound) -> 
                     model,
                     [
@@ -284,6 +292,7 @@ let rec processMessage msg model =
             else
                 returnModel model
 
+
         | Move (tid, Delta (x,y)) ->
             match model.moving with
             | Some (origin,cards,Point (oldX, oldY),s,id) when id = tid ->
@@ -291,20 +300,39 @@ let rec processMessage msg model =
                     moving = Some (origin,cards,Point (oldX + x, oldY + y),s,id)
                     }
                     ,[]
+
             | _ -> returnModel model
+
 
         | CancelMove tid ->
             let returnCardsToOrigin =
                 match model.moving with
                 | Some (Pile pile,cards,_,_,id) when id = tid -> modifyPile pile ((@) cards)
+
                 | Some (Tableau tableau,cards,_,_,id) when id = tid -> modifyTableauFaceUp tableau ((@) cards)
+
                 | _ -> idFunc
 
             returnModel { returnCardsToOrigin model with moving = None}
 
-        | CommitMove (target,tid) ->
-            match model.moving with
-            | Some (_,cards,_,_,id) when tid = id ->
+
+        | StageMove ( face, target ) ->
+            match model.pendingMove with
+            | Some _ -> returnModel model
+
+            | None -> returnModel { model with pendingMove = Some target }
+
+
+        | UnstageMove ->
+            match model.pendingMove with
+            | Some _ -> returnModel { model with pendingMove = None }
+
+            | None -> returnModel model
+
+
+        | CommitMove tid ->
+            match model.moving, model.pendingMove with
+            | Some (_,cards,_,_,id), Some target when tid = id ->
 
                 match cards,target with
                 | _,Pile Stock | _,Pile Talon -> model, [ Msg (CancelMove id)]
@@ -321,8 +349,11 @@ let rec processMessage msg model =
                     { modifyTableauFaceUp tableau ((@) cards) model with moving = None }, [Msg MoveCommitted]
 
                 | _ -> model,[Msg (CancelMove id)]
-                
+            
+            | Some (_,_,_,_,id), None -> model,[Msg (CancelMove id)]
+
             | _ -> returnModel model
+
 
         | MoveCommitted ->
             if [model.heartsFoundation;model.spadesFoundation;model.diamondsFoundation;model.clubsFoundation] |> List.map List.length = [12;12;12;12]
@@ -338,13 +369,16 @@ let rec processMessage msg model =
                 |> modifyTableau Tableau7 replenish
                 |> returnModel
 
+
         | CardTapped (_,face) -> model,[Cmd (PlaySound (getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0))]
+
 
         | FlipTalon -> 
             model
             |> setPile Talon []
             |> setPile Stock (List.rev model.talon)
             |> returnModel
+
 
         | HandleMovingSound ->
             match model.moving with

@@ -84,6 +84,7 @@ type Model = {
     diamondsFoundation : Card list
     clubsFoundation : Card list
     moving : MovingModel option
+    pendingMove : MoveOrigin option
     rng : System.Random
     popReady : bool
     pendingGestures : PendingGesture list

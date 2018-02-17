@@ -38,6 +38,11 @@ let mapOption f option =
     | None -> None
     | Some value -> Some (f value)
 
+let rec values = function
+| [] -> []
+| Some x :: xs -> x :: values xs
+| None :: xs -> [] @ values xs
+
 let (<?>) f arg = mapOption (fun f -> f arg) f
 
 //
@@ -163,6 +168,9 @@ let intersect (BoundingBox (xa,ya,wa,ha)) (BoundingBox (xb,yb,wb,hb)) =
     else
         Some (BoundingBox (xc, yc, wc, hc))
 
+let area ( BoundingBox ( _, _, w, h ) ) =
+    w * h
+
 type GameObject<'a> = {
     textures : string list
     box : BoundingBox
@@ -177,7 +185,7 @@ let tag { tag = tag } = tag
 let box { box = box} = box
 
 type GameObjectDrawRequest<'a> =
-    | Area of BoundingBox * 'a
+    | Area of string * Point * 'a
     | Sprite of string list * Point * float * 'a
 
 type GameState<'m, 't> = {
