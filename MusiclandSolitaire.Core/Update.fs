@@ -11,20 +11,20 @@ open Model
 //
 
 let rec deal cards =
-    state {
+    State.builder {
         for card in cards do
-            let! tableauDealMoves = gets getTableauDealMoves
-            let! model = gets getModel
+            let! tableauDealMoves = State.gets getTableauDealMoves
+            let! model = State.gets getModel
 
             match tableauDealMoves with
             | [] ->
-                do! model |> pushCardToPile Stock card |> setModel |> modify
+                do! model |> pushCardToPile Stock card |> setModel |> State.modify
 
             | (tableau, faceUp) :: moves ->
-                do! setTableauDealMoves moves |> modify
-                do! model |> pushCardToTableau tableau faceUp card |> setModel |> modify
+                do! setTableauDealMoves moves |> State.modify
+                do! model |> pushCardToTableau tableau faceUp card |> setModel |> State.modify
 
-        return! gets getModel
+        return! State.gets getModel
     }
 
 let initModel rng = 
@@ -66,7 +66,7 @@ let initModel rng =
         model = model
         }
 
-    evalState dealingState (deal deck)
+    State.eval dealingState (deal deck)
 
 let getFaceContent face =
     match face with
@@ -103,7 +103,7 @@ type TagId =
     | Target of Card * MoveOrigin
 
 type Msg =
-    | Step of GameTime
+    | Step
     | PreparePop
     | PopStock
     | BeginMove of MoveOrigin * int * Point * int
@@ -116,7 +116,6 @@ type Msg =
     | Reset
     | CardTapped of Card
     | FlipTalon
-    | HandleMovingSound
 
 type Tag = {
     id : TagId
@@ -191,20 +190,20 @@ let rec messagesFromObjects = function
     |> List.append (messagesFromObjects os)
 | _ :: os -> messagesFromObjects os
 
-let messages objects gestures gameTime = Step gameTime :: (gestures |> List.collect (messagesFromGesture objects)) @ messagesFromObjects objects
+let messages objects gestures gameTime = Step :: (gestures |> List.collect (messagesFromGesture objects)) @ messagesFromObjects objects
 
 let setModel model (UpdateResult (_,cmds)) = UpdateResult (model,cmds)
 
 let addCommand command (UpdateResult (model,cmds)) = UpdateResult (model,command :: cmds)
 
 let getModel = 
-    state { 
-        let! UpdateResult (model,_) = getState
+    State.builder { 
+        let! UpdateResult (model,_) = State.get
         return model 
     }
 
-let rec sendMessages processMessage = function
-| [] -> getState
+let rec sendMessages processMessage gameTime = function
+| [] -> State.get
 | msg::msgs ->
 
     let rec messages = function
@@ -217,29 +216,29 @@ let rec sendMessages processMessage = function
     | (Msg _) :: ops -> commands ops
     | (Cmd cmd) :: ops -> cmd :: commands ops
 
-    state {
+    State.builder {
         let! model = getModel
-        let model,nextOperations = processMessage msg model
-        do! modify (setModel model)
+        let model,nextOperations = processMessage msg model gameTime
+        do! State.modify (setModel model)
         for cmd in commands nextOperations do
-            do! modify (addCommand cmd)
-        return! sendMessages processMessage ((messages nextOperations) @ msgs)
+            do! State.modify (addCommand cmd)
+        return! sendMessages processMessage gameTime ((messages nextOperations) @ msgs)
     }
 
 let returnModel model = model,[]
 
 let wrapOperation processMessage : Operation -> Update<Model, Tag> = function
-| Msg msg -> fun {model=model} -> sendMessages processMessage [msg] |> evalState (UpdateResult (returnModel model))
+| Msg msg -> fun {model=model; gameTime = gameTime} -> sendMessages processMessage gameTime [msg] |> State.eval (UpdateResult (returnModel model))
 | Cmd cmd -> fun {model=model} -> UpdateResult (model, [cmd])
 
-let rec processMessage msg model =
+let rec processMessage msg model gameTime =
     if model.won && msg <> Reset then
         returnModel model
     else
         match msg with
 
 
-        | Step gameTime -> 
+        | Step -> 
 
             let move gameTime progress = 
                 let speed = (10.0 - 30.0) * progress + 30.0
@@ -284,45 +283,32 @@ let rec processMessage msg model =
             if model.moving = None then
                 let pileSound = List.head >> snd >> getFaceContent >> Some
                 let tableauSound = (fun n -> List.take n >> List.last >> snd >> getFaceContent >> Some)
-                let susSound = Option.map (fun s -> s + "_Sus")
                 
-                let cardsInPile, pickCards, sound, moving =
+                let cardsInPile, pickCards, moving =
                     match model.moving,origin,count with
                     | None, Pile pile, 1 when pile <> Stock ->
                         let cardsInPile = getPile pile model
                         let pickCards = flip (setPile pile)
-                        let sound = pileSound cardsInPile
-                        cardsInPile, pickCards, sound, Some (origin,(List.take 1 cardsInPile),pos,susSound sound, id) 
+                        cardsInPile, pickCards, Some (origin,(List.take 1 cardsInPile),pos, id) 
 
                     | None, Tableau tableau, n when n <= (getTableau tableau model |> faceUp |> List.length) && n > 0 ->
                         let cardsInTableau = getTableau tableau model |> faceUp
                         let pickCards = setTableauFaceUp tableau
-                        let sound = tableauSound n cardsInTableau
-                        cardsInTableau, pickCards, sound, Some (origin,(List.take n cardsInTableau),pos,susSound sound, id) 
+                        cardsInTableau, pickCards, Some (origin,(List.take n cardsInTableau),pos, id) 
 
-                    | _ -> [], idFunc2, None, None
+                    | _ -> [], idFunc2, None
 
-                let model = { pickCards model (List.skip count cardsInPile) with moving = moving }
+                returnModel { pickCards model (List.skip count cardsInPile) with moving = moving }
 
-                match sound with
-                | None -> returnModel model
-
-                | (Some sound) -> 
-                    model,
-                    [
-                        Cmd (PlaySound (sound + "_Sus",SoundMode.Overlap,0.5))
-                        Cmd (Delay (1.0, wrapOperation processMessage (Msg HandleMovingSound)))
-                        Msg HandleMovingSound
-                    ]
             else
                 returnModel model
 
 
         | Move (tid, Delta (x,y)) ->
             match model.moving with
-            | Some (origin,cards,Point (oldX, oldY),s,id) when id = tid ->
+            | Some (origin,cards,Point (oldX, oldY),id) when id = tid ->
                 { model with
-                    moving = Some (origin,cards,Point (oldX + x, oldY + y),s,id)
+                    moving = Some (origin,cards,Point (oldX + x, oldY + y),id)
                     }
                     ,[]
 
@@ -332,9 +318,9 @@ let rec processMessage msg model =
         | CancelMove tid ->
             let returnCardsToOrigin =
                 match model.moving with
-                | Some (Pile pile,cards,_,_,id) when id = tid -> modifyPile pile ((@) cards)
+                | Some (Pile pile,cards,_,id) when id = tid -> modifyPile pile ((@) cards)
 
-                | Some (Tableau tableau,cards,_,_,id) when id = tid -> modifyTableauFaceUp tableau ((@) cards)
+                | Some (Tableau tableau,cards,_,id) when id = tid -> modifyTableauFaceUp tableau ((@) cards)
 
                 | _ -> idFunc
 
@@ -347,7 +333,13 @@ let rec processMessage msg model =
 
         | StageMove ( face, target, point ) ->
             match model.moving, model.pendingMove, model.unstaging with
-            | Some (_,_,movingPos,_,_) , None, None -> returnModel { model with pendingMove = MoveModel ( target, movingPos, point, 0.0 ) |> Some }
+            | Some (_,cards,movingPos,_) , None, None -> 
+                let movingFace = List.last cards |> snd
+                { model with pendingMove = MoveModel ( target, movingPos, point, 0.0 ) |> Some }
+                , [
+                  PlaySound ( getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 )
+                  Delay ( 0.33, PlaySound ( getFaceContent movingFace, (if movingFace = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 ) |> Cmd |> wrapOperation processMessage )
+                  ] |> List.map Cmd
 
             | _ -> returnModel model
 
@@ -365,7 +357,7 @@ let rec processMessage msg model =
 
         | CommitMove tid ->
             match model.moving, model.pendingMove with
-            | Some (_,cards,_,_,id), Some ( MoveModel ( target, _, _, _ ) ) when tid = id ->
+            | Some (_,cards,_,id), Some ( MoveModel ( target, _, _, _ ) ) when tid = id ->
 
                 match cards,target with
                 | _,Pile Stock | _,Pile Talon -> model, [ Msg (CancelMove id)]
@@ -383,7 +375,7 @@ let rec processMessage msg model =
 
                 | _ -> model,[Msg (CancelMove id)]
             
-            | Some (_,_,_,_,id), None -> model,[Msg (CancelMove id)]
+            | Some (_,_,_,id), None -> model,[Msg (CancelMove id)]
 
             | _ -> returnModel model
 
@@ -419,16 +411,6 @@ let rec processMessage msg model =
             |> returnModel
 
 
-        | HandleMovingSound ->
-            match model.moving with
-            | Some (_,_,_,Some sound,_) -> 
-                model,
-                    [
-                    Cmd (Delay (1.0,wrapOperation processMessage (Msg HandleMovingSound)))
-                    Cmd (PlaySound (sound,SoundMode.Overlap,0.5))
-                    ]
-            | _ -> returnModel model
-
 let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
 
     printfn "%f" (1.0 / ((float gameState.gameTime.elapsed.Milliseconds) * 0.001))
@@ -444,5 +426,5 @@ let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
             }
 
     messages (List.rev gameState.objects) (gestures gestureResults) gameState.gameTime 
-    |> sendMessages processMessage
-    |> evalState (UpdateResult (returnModel model))
+    |> sendMessages processMessage gameState.gameTime
+    |> State.eval (UpdateResult (returnModel model))

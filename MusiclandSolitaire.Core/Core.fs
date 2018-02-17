@@ -49,63 +49,7 @@ let (<?>) f arg = mapOption (fun f -> f arg) f
 // --------- State ---------
 //
 
-type State<'s,'v> = State of ('s -> 'v * 's)
 
-let runState initial state = match state with State f -> f initial
-
-type StateBuilder() =
-
-    member this.Zero () = State(fun s -> (), s)
-
-    member this.Return x = State(fun s -> x, s)
-
-    member inline this.ReturnFrom (x) = x
-
-    member this.Bind (x, f) =
-        State(fun state ->
-            let (result: 'a), state = runState state x
-            runState state (f result))
-    
-    member this.Combine (x1, x2) =
-        State(fun state ->
-            let result, state = runState state x1
-            runState state x2)
-    
-    member this.Delay f = f ()
-
-    member this.For (seq, f) =
-        if Seq.length seq = 0 then
-            this.Zero ()
-        else
-            seq
-            |> Seq.map f
-            |> Seq.reduceBack (fun x1 x2 -> this.Combine (x1, x2))
-    
-    member this.While (f, x) =
-        if f () then this.Combine (x, this.While (f, x))
-        else this.Zero ()
-
-let state = StateBuilder()
-
-let getState = State (fun s -> (s,s))
-
-let putState newState = State (fun s -> ((), newState))
-
-let modify f =
-    state {
-        let! x = getState
-        do! putState (f x)
-    }
-
-let gets f =
-    state {
-        let! x = getState
-        return f x
-    }
-
-let evalState initial state = runState initial state |> fst
-
-let execState initial state = runState initial state |> snd
 
 
 

@@ -292,7 +292,7 @@ let tableaus model =
 let moving model =
     match model.moving with
     | None -> []
-    | Some (_,cards,movingPosition,_,_) ->
+    | Some (_,cards,movingPosition,_) ->
         let bottom = List.head cards
         let position =
             match model.pendingMove, model.unstaging with

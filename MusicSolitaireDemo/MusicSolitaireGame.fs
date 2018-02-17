@@ -110,13 +110,13 @@ type Game<'m, 't>(engine : GameEngine<'m, 't>) as this =
     let processEvent (TimerEnd callback) = callback
 
     let rec processEvents (events : System.Collections.Concurrent.ConcurrentQueue<Event<'m, 't>>) gameState =
-        state {
+        State.builder {
             match events.TryDequeue() with
             | false,_ -> return gameState
             | true,event ->
-                let! commands = getState
+                let! commands = State.get
                 let (UpdateResult (model,newCommands)) = processEvent event gameState
-                do! putState (commands @ newCommands)
+                do! State.put (commands @ newCommands)
                 return! processEvents events { gameState with model = model } 
         }
 
@@ -134,14 +134,14 @@ type Game<'m, 't>(engine : GameEngine<'m, 't>) as this =
             model = this.model 
             }
         let model,commands = 
-            state {
+            State.builder {
                 let! gameState = lock events (fun () -> processEvents events gameState)
-                let! commands = getState
+                let! commands = State.get
                 let (UpdateResult (model,newCommands)) = engine.update gameState
-                do! putState (commands @ newCommands)
+                do! State.put (commands @ newCommands)
                 return model
             }
-            |> runState []
+            |> State.run []
         this.model <- model
         runCommands commands                
         base.Update(gameTime)
