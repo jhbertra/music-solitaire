@@ -50,6 +50,7 @@ let initModel rng =
         pendingGestures = []
         previousTouches = []
         pendingMove = None
+        unstaging = None
         }
 
     let deck = 
@@ -102,13 +103,14 @@ type TagId =
     | Target of Card * MoveOrigin
 
 type Msg =
+    | Step of GameTime
     | PreparePop
     | PopStock
     | BeginMove of MoveOrigin * int * Point * int
     | Move of int * Delta
     | CancelMove of int
     | StageMove of Face * MoveOrigin * Point
-    | UnstageMove
+    | UnstageMove of MoveOrigin
     | CommitMove of int
     | MoveCommitted
     | Reset
@@ -189,7 +191,7 @@ let rec messagesFromObjects = function
     |> List.append (messagesFromObjects os)
 | _ :: os -> messagesFromObjects os
 
-let messages objects gestures = (gestures |> List.collect (messagesFromGesture objects)) @ messagesFromObjects objects
+let messages objects gestures gameTime = Step gameTime :: (gestures |> List.collect (messagesFromGesture objects)) @ messagesFromObjects objects
 
 let setModel model (UpdateResult (_,cmds)) = UpdateResult (model,cmds)
 
@@ -237,6 +239,24 @@ let rec processMessage msg model =
         match msg with
 
 
+        | Step gameTime -> 
+
+            let move gameTime progress = 
+                let speed = (10.0 - 30.0) * progress + 30.0
+                let step = ((float gameTime.elapsed.Milliseconds) * 0.001) * speed
+                min 1.0 (progress + step)
+
+            match model.unstaging, model.pendingMove with
+
+            | Some ( UnstagingModel ( origin, progress ) ), _ -> 
+                let progress = move gameTime progress
+                returnModel { model with unstaging = if progress = 1.0 then None else Some ( UnstagingModel ( origin, progress ) ) }
+
+            | _, Some ( MoveModel ( target, origin, dest, progress ) ) -> returnModel { model with pendingMove = Some ( MoveModel ( target, origin, dest, move gameTime progress ) ) }
+
+            | _ -> returnModel model
+
+
         | Reset -> initModel model.rng |> returnModel
 
 
@@ -244,15 +264,19 @@ let rec processMessage msg model =
 
 
         | PopStock ->
+
             match (model.popReady),(model.stock) with
             | false,_ -> model
+
             | true,[] -> model
+
             | true,(head::tail) -> 
                 { model with
                     stock = tail
                     talon = head :: model.talon
                     popReady = false
                 }
+
             |> returnModel
 
 
@@ -314,40 +338,48 @@ let rec processMessage msg model =
 
                 | _ -> idFunc
 
-            returnModel { returnCardsToOrigin model with moving = None}
+            returnModel
+                { returnCardsToOrigin model with 
+                    moving = None
+                    pendingMove = None
+                    unstaging = None }
 
 
         | StageMove ( face, target, point ) ->
-            match model.pendingMove with
-            | Some _ -> returnModel model
+            match model.moving, model.pendingMove, model.unstaging with
+            | Some (_,_,movingPos,_,_) , None, None -> returnModel { model with pendingMove = MoveModel ( target, movingPos, point, 0.0 ) |> Some }
 
-            | None -> returnModel { model with pendingMove = MoveModel ( target, point ) |> Some }
+            | _ -> returnModel model
 
 
-        | UnstageMove ->
-            match model.pendingMove with
-            | Some _ -> returnModel { model with pendingMove = None }
+        | UnstageMove target ->
+            match model.unstaging, model.pendingMove with
+            | None, Some ( MoveModel (  moveTarget, origin, dest, progress ) ) when target = moveTarget -> 
+                returnModel 
+                    { model with 
+                        pendingMove = None
+                        unstaging = Some ( UnstagingModel ( lerp origin dest progress, 0.0 ) ) }
 
-            | None -> returnModel model
+            | _ -> returnModel model
 
 
         | CommitMove tid ->
             match model.moving, model.pendingMove with
-            | Some (_,cards,_,_,id), Some ( MoveModel ( target, _ ) ) when tid = id ->
+            | Some (_,cards,_,_,id), Some ( MoveModel ( target, _, _, _ ) ) when tid = id ->
 
                 match cards,target with
                 | _,Pile Stock | _,Pile Talon -> model, [ Msg (CancelMove id)]
 
                 | [card],Pile pile when canPlaceOnFoundation (getPile pile model) (getSuit pile) card ->
                     let face = (snd card)
-                    { pushCardToPile pile card model with moving = None },
+                    pushCardToPile pile card model,
                         [ 
                             Cmd (PlaySound ((getFaceContent face),(if face = KeySignature then NoOverlap else SoundMode.Overlap),1.0))
                             Msg MoveCommitted
                         ]
                         
                 | cards,Tableau tableau when canPlaceOnTableau (getTableau tableau model |> faceUp) cards ->
-                    { modifyTableauFaceUp tableau ((@) cards) model with moving = None }, [Msg MoveCommitted]
+                    modifyTableauFaceUp tableau ((@) cards) model, [Msg MoveCommitted]
 
                 | _ -> model,[Msg (CancelMove id)]
             
@@ -357,6 +389,12 @@ let rec processMessage msg model =
 
 
         | MoveCommitted ->
+            let model = 
+                { model with 
+                    moving = None
+                    pendingMove = None
+                    unstaging = None }
+
             if [model.heartsFoundation;model.spadesFoundation;model.diamondsFoundation;model.clubsFoundation] |> List.map List.length = [12;12;12;12]
             then
                 { model with won = true }, [Cmd (Delay (1.0,wrapOperation processMessage (Cmd (PlaySound ("Stack",NoOverlap,1.0)))))]
@@ -392,6 +430,9 @@ let rec processMessage msg model =
             | _ -> returnModel model
 
 let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
+
+    printfn "%f" (1.0 / ((float gameState.gameTime.elapsed.Milliseconds) * 0.001))
+
     let gestureResults =
         touchEvents gameState.model.previousTouches gameState.touches gameState.gameTime
         |> processEvents gameState.model.pendingGestures
@@ -402,6 +443,6 @@ let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
             previousTouches = gameState.touches
             }
 
-    messages (List.rev gameState.objects) (gestures gestureResults)
+    messages (List.rev gameState.objects) (gestures gestureResults) gameState.gameTime 
     |> sendMessages processMessage
     |> evalState (UpdateResult (returnModel model))

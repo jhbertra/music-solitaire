@@ -226,11 +226,11 @@ let drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y) =
       ) 
 
 let movingOverlap movingFace = function
-| Overlap ({id = TagId.Target ((_,face), target); position = Point ( x, y ) },box) when area box > 4000.0 ->
-    StageMove ( face, target, Point ( x, y + cardSpacing ) ) |> Some
+| Overlap ({id = TagId.Target ((_,face), target); position = point },box) when area box > 4000.0 ->
+    StageMove ( face, target, point ) |> Some
 
-| Overlap ({id = TagId.Target _},_) ->
-    Some UnstageMove
+| Overlap ({id = TagId.Target (_, target) },box) ->
+    UnstageMove target |> Some
 
 | _ -> None
 
@@ -240,7 +240,7 @@ let rec drawFannedPile pile getTextures position dragged touchUp tapped topArea 
     | [],_ -> []
     | ((suit, face) :: []),Point (x,y) -> 
         drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y)
-        :: topArea ( Point ( x, y ) ) suit face
+        :: topArea ( Point ( x, y + cardSpacing ) ) suit face
     | ((suit, face) :: tail),Point (x,y) -> 
         drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y)
         :: drawFannedPile tail getTextures ( Point ( x, y + cardSpacing ) ) dragged touchUp tapped topArea
@@ -295,9 +295,10 @@ let moving model =
     | Some (_,cards,movingPosition,_,_) ->
         let bottom = List.head cards
         let position =
-            match model.pendingMove with
-            | None -> movingPosition
-            | Some ( MoveModel ( _, point ) ) -> point
+            match model.pendingMove, model.unstaging with
+            | _, Some ( UnstagingModel ( origin, progress ) ) -> lerp origin movingPosition progress
+            | Some ( MoveModel ( _, origin, dest, progress ) ), _ -> lerp origin dest progress
+            | _ -> movingPosition
         Area 
           ( "CardBack"
           , movingPosition

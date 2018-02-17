@@ -131,6 +131,8 @@ type GameTime = {
 
 type Point = Point of float*float
 
+let lerp ( Point ( x1, y1 ) ) ( Point ( x2, y2 ) ) t = Point ( (x2 - x1) * t + x1, (y2 - y1) * t + y1 )
+
 type Touch = Touch of int * Point
 
 let id (Touch (id,_)) = id
