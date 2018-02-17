@@ -121,6 +121,7 @@ let background =
       , (Point (0.0, 0.0))
       , 1.0
       , {
+        id = TagId.Background
         tapHandler = None
         touchDownHandler = None
         touchUpHandler = Some handleTouchUp
@@ -136,6 +137,7 @@ let flipTalon =
       , (Point (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)))
       , 0.5
       , {
+        id = TagId.FlipTalon
         tapHandler = handler FlipTalon
         touchDownHandler = None
         touchUpHandler = None
@@ -151,6 +153,7 @@ let reset =
     , (Point (26.0,1252.0))
     , 1.0
     , {
+      id = TagId.Reset
       tapHandler = handler Reset
       touchDownHandler = None
       touchUpHandler = None
@@ -169,6 +172,7 @@ let drawPile pile getTextures position touchDown dragged touchUp tapped =
           , position
           , 1.0
           , {
+            id = TagId.Card (suit, face)
             tapHandler = 
                 optional { 
                     let! f = tapped
@@ -229,6 +233,7 @@ let rec drawFannedPile pile getTextures position dragged touchUp tapped =
           , Point (x,y)
           , 1.0
           , {
+            id = TagId.Card (suit, face)
             tapHandler = tapped face suit
             touchDownHandler = None
             touchUpHandler = touchUp pile

@@ -92,6 +92,12 @@ let getSuitContent suit =
 // --------- Msg ---------
 //
 
+type TagId =
+    | Background
+    | FlipTalon
+    | Reset
+    | Card of Card
+
 type Msg =
     | PreparePop
     | PopStock
@@ -105,10 +111,8 @@ type Msg =
     | FlipTalon
     | HandleMovingSound
 
-type TagId =
-    | Background
-
 type Tag = {
+    id : TagId
     tapHandler : (int -> Point -> Msg) option
     touchDownHandler : (int -> Point -> Msg) option
     touchUpHandler : (int -> Point -> Msg) option
@@ -362,6 +366,7 @@ let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
             pendingGestures = pendingGestures gestureResults
             previousTouches = gameState.touches
             }
+
     messages (List.rev gameState.objects) (gestures gestureResults)
     |> sendMessages processMessage
     |> evalState (UpdateResult (returnModel model))
