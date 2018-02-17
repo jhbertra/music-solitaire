@@ -96,15 +96,31 @@ let handleTouchUp id position =
         CommitMove (Pile DiamondsFoundation,id)
     else if isPositionWithinBox clubsFoundationPosition then
         CommitMove (Pile ClubsFoundation,id)
+    else if isPositionWithinBox tableau1Position then
+        CommitMove (Tableau Tableau1,id)
+    else if isPositionWithinBox tableau2Position then
+        CommitMove (Tableau Tableau2,id)
+    else if isPositionWithinBox tableau3Position then
+        CommitMove (Tableau Tableau3,id)
+    else if isPositionWithinBox tableau4Position then
+        CommitMove (Tableau Tableau4,id)
+    else if isPositionWithinBox tableau5Position then
+        CommitMove (Tableau Tableau5,id)
+    else if isPositionWithinBox tableau6Position then
+        CommitMove (Tableau Tableau6,id)
+    else if isPositionWithinBox tableau7Position then
+        CommitMove (Tableau Tableau7,id)
     else
         CancelMove id
+
+let handler msg = Some (fun _ _ -> msg)
 
 let background =
     Sprite 
       ( ["Table"]
       , (Point (0.0, 0.0))
-      , 1.0, 
-        {
+      , 1.0
+      , {
         tapHandler = None
         touchDownHandler = None
         touchUpHandler = Some handleTouchUp
@@ -118,9 +134,9 @@ let flipTalon =
     Sprite
       ( ["Reset"]
       , (Point (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)))
-      , 0.5, 
-        {
-        tapHandler = (Some (fun _ _ -> FlipTalon))
+      , 0.5
+      , {
+        tapHandler = handler FlipTalon
         touchDownHandler = None
         touchUpHandler = None
         dragHandler = None
@@ -128,20 +144,44 @@ let flipTalon =
         overlapHandler = None
         }
       )
-(*
-let drawPile pile getTextures position touchDown touchMoved touchUp tapped =
+
+let reset =
+  Sprite
+    ( ["Reset"]
+    , (Point (26.0,1252.0))
+    , 1.0
+    , {
+      tapHandler = handler Reset
+      touchDownHandler = None
+      touchUpHandler = None
+      dragHandler = None
+      stopTouchPropagation = true
+      overlapHandler = None
+      }
+    )
+
+let drawPile pile getTextures position touchDown dragged touchUp tapped =
     match pile with
     | [] -> []
     | (suit, face)::_ -> 
-        [{
-            textures = getTextures suit face
-            position = position
-            touchDown = touchDown
-            touchMoved = touchMoved
-            touchUp = touchUp
-            tapped = tapped suit face
-            alpha = 1.0
-        }]
+        [Sprite
+          ( getTextures suit face
+          , position
+          , 1.0
+          , {
+            tapHandler = 
+                optional { 
+                    let! f = tapped
+                    return! f suit face 
+                    }
+            touchDownHandler = touchDown
+            touchUpHandler = touchUp
+            dragHandler = dragged
+            stopTouchPropagation = true
+            overlapHandler = None
+            }
+          )
+        ]
 
 let cardBack _ _ = ["CardBack"]
 
@@ -151,74 +191,78 @@ let stock model =
     drawPile
         model.stock
         cardBack
-        stockPosition
-        (Some (fun _ -> (fun _ -> Msg PreparePop)))
+        (Point stockPosition)
+        (handler PreparePop)
         None
-        (if model.popReady then (Some (fun _ -> (fun _ -> Msg PopStock))) else None)
-        (fun _ _ -> None)
+        None
+        (handler (if model.popReady then handler PopStock else None))
+
 
 let faceUpPile cards pile position =
     drawPile
         cards
         cardFront
         position
-        (Some (fun _ -> (fun id -> Msg (BeginMove (pile,1,position,id)))))
+        (Some (fun id _ -> BeginMove (Pile pile,1,position,id)))
         None
-        (Some (fun _ -> (fun id -> Msg (CommitMove (pile,id)))))
-        (fun suit face -> (suit,face) |> CardTapped |> Some)
+        (Some (fun id _ -> CommitMove (Pile pile,id)))
+        (Some (fun suit face -> handler (CardTapped ((suit,face)))))
 
 let talon model =
     faceUpPile
         model.talon
         Talon
-        talonPosition
+        (Point talonPosition)
 
 let foundations model =
-    faceUpPile model.heartsFoundation HeartsFoundation heartsFoundationPosition
-    @ faceUpPile model.spadesFoundation SpadesFoundation spadesFoundationPosition
-    @ faceUpPile model.diamondsFoundation DiamondsFoundation diamondsFoundationPosition
-    @ faceUpPile model.clubsFoundation ClubsFoundation clubsFoundationPosition
+    faceUpPile model.heartsFoundation HeartsFoundation (Point heartsFoundationPosition)
+    @ faceUpPile model.spadesFoundation SpadesFoundation (Point spadesFoundationPosition)
+    @ faceUpPile model.diamondsFoundation DiamondsFoundation (Point diamondsFoundationPosition)
+    @ faceUpPile model.clubsFoundation ClubsFoundation (Point clubsFoundationPosition)
 
 let rec drawFannedPile pile getTextures position touchDown touchUp tapped =
     match pile,position with
     | [],_ -> []
-    | ((suit, face) :: tail),(x,y) ->
-        {
-            textures = getTextures suit face
-            position = x,y
-            touchDown = touchDown pile position
-            touchMoved = None
-            touchUp = touchUp pile
-            tapped = tapped face suit
-            alpha = 1.0
-        }
-        :: (drawFannedPile tail getTextures (x,y+32.0) touchDown touchUp tapped)
+    | ((suit, face) :: tail),Point (x,y) ->
+        Sprite
+          ( getTextures suit face
+          , Point (x,y)
+          , 1.0
+          , {
+            tapHandler = tapped face suit
+            touchDownHandler = touchDown pile position
+            touchUpHandler = touchUp pile
+            dragHandler = None
+            stopTouchPropagation = true
+            overlapHandler = None
+            }
+          ) :: (drawFannedPile tail getTextures (Point (x,y+32.0)) touchDown touchUp tapped)
 
-let tableau down up tableau position model =
-    let x,y = position
+let tableau tableau (x,y) model =
+    let (Tableau.Tableau (up, down)) = getTableau tableau model
     drawFannedPile 
         down
         cardBack
-        (x,y)
+        (Point (x,y))
         (fun _ _ -> None)
         (fun _ -> None)
         (fun _ _ -> None)
     @ drawFannedPile
         (List.rev up)
         cardFront
-        (x,(y + 32.0 * (float)(List.length down)))
-        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun _ -> (fun id -> Msg (BeginMove (tableau,x,pos,id))))) | _ -> None)
-        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun _ -> (fun id -> Msg (CommitMove (tableau,id)))) | _ -> None)
-        (fun suit face -> (face,suit) |> CardTapped |> Some)
+        (Point (x,(y + 32.0 * (float)(List.length down))))
+        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun id _ -> BeginMove (Tableau tableau,x,pos,id))) | _ -> None)
+        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun id _ -> CommitMove (Tableau tableau,id)) | _ -> None)
+        (fun suit face -> (handler (CardTapped (face,suit))))
 
 let tableaus model =
-    tableau [] model.tableau1 Tableau1 tableau1Position model 
-    @ match model.tableau2 with up,down -> tableau down up Tableau2 tableau2Position model 
-    @ match model.tableau3 with up,down -> tableau down up Tableau3 tableau3Position model 
-    @ match model.tableau4 with up,down -> tableau down up Tableau4 tableau4Position model 
-    @ match model.tableau5 with up,down -> tableau down up Tableau5 tableau5Position model 
-    @ match model.tableau6 with up,down -> tableau down up Tableau6 tableau6Position model 
-    @ match model.tableau7 with up,down -> tableau down up Tableau7 tableau7Position model 
+    tableau Tableau1 tableau1Position model 
+    @ tableau Tableau2 tableau2Position model 
+    @ tableau Tableau3 tableau3Position model 
+    @ tableau Tableau4 tableau4Position model 
+    @ tableau Tableau5 tableau5Position model 
+    @ tableau Tableau6 tableau6Position model 
+    @ tableau Tableau7 tableau7Position model 
 
 let moving model =
     match model.moving with
@@ -231,14 +275,13 @@ let moving model =
             (fun _ _ -> None)
             (fun _ -> None)
             (fun _ _ -> None)
-        *)
 
 let draw model =
     background
-    :: [flipTalon]
-    (* :: stock model
+    :: flipTalon
+    :: reset
+    :: stock model
     @ talon model
     @ foundations model
     @ tableaus model
     @ moving model
-    @ [{textures = ["Reset"]; position = 26.0,1252.0; touchDown = None; touchMoved = None; touchUp = (Some (fun _ -> (fun _ -> Msg Reset))); tapped = None; alpha = 1.0}]*)

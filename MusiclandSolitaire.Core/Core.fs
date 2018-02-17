@@ -16,6 +16,9 @@ type OptionalBuilder() =
     member __.Return(value) =
         Some value
 
+    member __.ReturnFrom(o) =
+        o
+
     member __.Zero() =
         None
     

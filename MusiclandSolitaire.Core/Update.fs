@@ -4,62 +4,6 @@ open Core
 open Touch
 open Model
 
-let getFaceContent face =
-    match face with
-        | KeySignature -> "Ks"
-        | Do -> "Do"
-        | Re -> "Re"
-        | Mi -> "Mi"
-        | Fa -> "Fa"
-        | So -> "So"
-        | La -> "La"
-        | Ti -> "Ti"
-        | Do8 -> "Do8"
-        | IV -> "IV"
-        | V -> "V"
-        | I -> "I"
-
-let getSuitContent suit =
-    match suit with
-        | Hearts -> "Hearts"
-        | Spades -> "Spades"
-        | Diamonds -> "Diamonds"
-        | Clubs -> "Clubs"
-
-//
-// --------- Msg ---------
-//
-
-type Msg =
-    | PreparePop
-    | PopStock
-    | BeginMove of MoveOrigin * int * Point * int
-    | Move of int * Delta
-    | CancelMove of int
-    | CommitMove of MoveOrigin * int
-    | MoveCommitted
-    | Reset
-    | CardTapped of Card
-    | FlipStock
-    | HandleMovingSound
-
-type TagId =
-    | Background
-
-type Tag = {
-    tapHandler : (int -> Point -> Msg) option
-    touchDownHandler : (int -> Point -> Msg) option
-    touchUpHandler : (int -> Point -> Msg) option
-    dragHandler : (int -> Delta -> Point -> Msg) option
-    stopTouchPropagation : bool
-    overlapHandler : (Overlap -> Msg) option
-}
-and Overlap = Overlap of Tag * BoundingBox
-
-type Operation =
-    | Msg of Msg
-    | Cmd of Cmd<Model, Tag>
-
 
 
 //
@@ -121,6 +65,68 @@ let initModel rng =
         }
 
     evalState dealingState (deal deck)
+
+let getFaceContent face =
+    match face with
+        | KeySignature -> "Ks"
+        | Do -> "Do"
+        | Re -> "Re"
+        | Mi -> "Mi"
+        | Fa -> "Fa"
+        | So -> "So"
+        | La -> "La"
+        | Ti -> "Ti"
+        | Do8 -> "Do8"
+        | IV -> "IV"
+        | V -> "V"
+        | I -> "I"
+
+let getSuitContent suit =
+    match suit with
+        | Hearts -> "Hearts"
+        | Spades -> "Spades"
+        | Diamonds -> "Diamonds"
+        | Clubs -> "Clubs"
+
+//
+// --------- Msg ---------
+//
+
+type Msg =
+    | PreparePop
+    | PopStock
+    | BeginMove of MoveOrigin * int * Point * int
+    | Move of int * Delta
+    | CancelMove of int
+    | CommitMove of MoveOrigin * int
+    | MoveCommitted
+    | Reset
+    | CardTapped of Card
+    | FlipTalon
+    | HandleMovingSound
+
+type TagId =
+    | Background
+
+type Tag = {
+    tapHandler : (int -> Point -> Msg) option
+    touchDownHandler : (int -> Point -> Msg) option
+    touchUpHandler : (int -> Point -> Msg) option
+    dragHandler : (int -> Delta -> Point -> Msg) option
+    stopTouchPropagation : bool
+    overlapHandler : (Overlap -> Msg) option
+}
+and Overlap = Overlap of Tag * BoundingBox
+
+type Operation =
+    | Msg of Msg
+    | Cmd of Cmd<Model, Tag>
+
+
+
+//
+// --------- Update ---------
+//
 
 let pointInBox (Point (x,y)) (BoundingBox (xb,yb,w,h)) =
     let xpb = x - xb
@@ -255,7 +261,7 @@ let rec processMessage msg model =
                     let cardsInTableau = getTableau tableau model |> faceUp
                     let pickCards = setTableauFaceUp tableau
                     let sound = tableauSound n cardsInTableau
-                    cardsInTableau, pickCards, sound, Some (origin,(List.take 1 cardsInTableau),pos,susSound sound, id) 
+                    cardsInTableau, pickCards, sound, Some (origin,(List.take n cardsInTableau),pos,susSound sound, id) 
 
                 | _ -> [], idFunc2, None, None
 
@@ -266,7 +272,6 @@ let rec processMessage msg model =
             | (Some sound) -> 
                 model,
                 [
-                    Cmd (PlaySound (sound, NoOverlap, 1.0))
                     Cmd (PlaySound (sound + "_Sus",SoundMode.Overlap,0.5))
                     Cmd (Delay (1.0, wrapOperation processMessage (Msg HandleMovingSound)))
                     Msg HandleMovingSound
@@ -295,7 +300,7 @@ let rec processMessage msg model =
             | Some (_,cards,_,_,id) when tid = id ->
 
                 match cards,target with
-                | _,Pile Stock | _,Pile Talon -> returnModel model
+                | _,Pile Stock | _,Pile Talon -> model, [ Msg (CancelMove id)]
 
                 | [card],Pile pile when canPlaceOnFoundation (getPile pile model) (getSuit pile) card ->
                     { pushCardToPile pile card model with moving = None },
@@ -327,7 +332,7 @@ let rec processMessage msg model =
 
         | CardTapped (_,face) -> model,[Cmd (PlaySound (getFaceContent face,NoOverlap,1.0))]
 
-        | FlipStock -> 
+        | FlipTalon -> 
             model
             |> setPile Talon []
             |> setPile Stock (List.rev model.talon)
