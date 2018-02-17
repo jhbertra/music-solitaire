@@ -84,6 +84,8 @@ let tableau5Position = 434.0,223.0
 let tableau6Position = 536.0,223.0
 let tableau7Position = 638.0,223.0
 
+let cardSpacing = 32.0
+
 let withinBox (Point (x,y)) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
 
 let handleTouchUp id _ = CommitMove id
@@ -91,12 +93,14 @@ let handleTouchUp id _ = CommitMove id
 let handler msg = Some (fun _ _ -> msg)
 
 let background =
+    let position = Point (0.0, 0.0)
     Sprite 
       ( ["Table"]
-      , (Point (0.0, 0.0))
+      , position
       , 1.0
       , {
         id = TagId.Background
+        position = position
         tapHandler = None
         touchDownHandler = None
         touchUpHandler = Some handleTouchUp
@@ -107,12 +111,14 @@ let background =
       )
 
 let flipTalon =
+    let position = Point (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0))
     Sprite
       ( ["Reset"]
-      , (Point (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0)))
+      , position
       , 0.5
       , {
         id = TagId.FlipTalon
+        position = position
         tapHandler = handler FlipTalon
         touchDownHandler = None
         touchUpHandler = None
@@ -123,20 +129,22 @@ let flipTalon =
       )
 
 let reset =
-  Sprite
-    ( ["Reset"]
-    , (Point (26.0,1252.0))
-    , 1.0
-    , {
-      id = TagId.Reset
-      tapHandler = handler Reset
-      touchDownHandler = None
-      touchUpHandler = None
-      dragHandler = None
-      stopTouchPropagation = true
-      overlapHandler = None
-      }
-    )
+    let position = Point (26.0,1252.0)
+    Sprite
+      ( ["Reset"]
+      , position
+      , 1.0
+      , {
+        id = TagId.Reset
+        position = position
+        tapHandler = handler Reset
+        touchDownHandler = None
+        touchUpHandler = None
+        dragHandler = None
+        stopTouchPropagation = true
+        overlapHandler = None
+        }
+      )
 
 let drawPile pile getTextures position touchDown dragged touchUp tapped =
     match pile with
@@ -148,6 +156,7 @@ let drawPile pile getTextures position touchDown dragged touchUp tapped =
           , 1.0
           , {
             id = TagId.Card (suit, face)
+            position = position
             tapHandler = 
                 optional { 
                     let! f = tapped
@@ -206,6 +215,7 @@ let drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y) =
       , 1.0
       , {
         id = TagId.Card (suit, face)
+        position = Point (x,y)
         tapHandler = tapped face suit
         touchDownHandler = None
         touchUpHandler = touchUp pile
@@ -216,8 +226,8 @@ let drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y) =
       ) 
 
 let movingOverlap movingFace = function
-| Overlap ({id = TagId.Target ((_,face), target)},box) when area box > 4000.0 ->
-    StageMove ( face, target ) |> Some
+| Overlap ({id = TagId.Target ((_,face), target); position = Point ( x, y ) },box) when area box > 4000.0 ->
+    StageMove ( face, target, Point ( x, y + cardSpacing ) ) |> Some
 
 | Overlap ({id = TagId.Target _},_) ->
     Some UnstageMove
@@ -233,7 +243,7 @@ let rec drawFannedPile pile getTextures position dragged touchUp tapped topArea 
         :: topArea ( Point ( x, y ) ) suit face
     | ((suit, face) :: tail),Point (x,y) -> 
         drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y)
-        :: drawFannedPile tail getTextures (Point (x,y+32.0)) dragged touchUp tapped topArea
+        :: drawFannedPile tail getTextures ( Point ( x, y + cardSpacing ) ) dragged touchUp tapped topArea
 
 let tableau tableau (x,y) model =
     let (Tableau.Tableau (up, down)) = getTableau tableau model
@@ -248,7 +258,7 @@ let tableau tableau (x,y) model =
     @ drawFannedPile
         (List.rev up)
         cardFront
-        (Point (x,(y + 32.0 * (float)(List.length down))))
+        (Point (x,(y + cardSpacing * (float)(List.length down))))
         (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun id _ _ -> BeginMove (Tableau tableau,x,pos,id))) | _ -> None)
         (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun id _ -> CommitMove id) | _ -> None)
         (fun suit face -> (handler (CardTapped (face,suit))))
@@ -258,6 +268,7 @@ let tableau tableau (x,y) model =
               , pos
               , { 
                 id = TagId.Target ( ( suit, face ), Tableau tableau )
+                position = pos
                 tapHandler = None
                 touchDownHandler = None
                 touchUpHandler = None
@@ -281,13 +292,18 @@ let tableaus model =
 let moving model =
     match model.moving with
     | None -> []
-    | Some (_,cards,position,_,_) ->
+    | Some (_,cards,movingPosition,_,_) ->
         let bottom = List.head cards
+        let position =
+            match model.pendingMove with
+            | None -> movingPosition
+            | Some ( MoveModel ( _, point ) ) -> point
         Area 
           ( "CardBack"
-          , position
+          , movingPosition
           , { 
             id = TagId.MovingBottom bottom
+            position = movingPosition
             tapHandler = None
             touchDownHandler = None
             touchUpHandler = None

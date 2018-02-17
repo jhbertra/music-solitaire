@@ -107,7 +107,7 @@ type Msg =
     | BeginMove of MoveOrigin * int * Point * int
     | Move of int * Delta
     | CancelMove of int
-    | StageMove of Face * MoveOrigin
+    | StageMove of Face * MoveOrigin * Point
     | UnstageMove
     | CommitMove of int
     | MoveCommitted
@@ -118,6 +118,7 @@ type Msg =
 
 type Tag = {
     id : TagId
+    position : Point
     tapHandler : (int -> Point -> Msg) option
     touchDownHandler : (int -> Point -> Msg) option
     touchUpHandler : (int -> Point -> Msg) option
@@ -316,11 +317,11 @@ let rec processMessage msg model =
             returnModel { returnCardsToOrigin model with moving = None}
 
 
-        | StageMove ( face, target ) ->
+        | StageMove ( face, target, point ) ->
             match model.pendingMove with
             | Some _ -> returnModel model
 
-            | None -> returnModel { model with pendingMove = Some target }
+            | None -> returnModel { model with pendingMove = MoveModel ( target, point ) |> Some }
 
 
         | UnstageMove ->
@@ -332,7 +333,7 @@ let rec processMessage msg model =
 
         | CommitMove tid ->
             match model.moving, model.pendingMove with
-            | Some (_,cards,_,_,id), Some target when tid = id ->
+            | Some (_,cards,_,_,id), Some ( MoveModel ( target, _ ) ) when tid = id ->
 
                 match cards,target with
                 | _,Pile Stock | _,Pile Talon -> model, [ Msg (CancelMove id)]

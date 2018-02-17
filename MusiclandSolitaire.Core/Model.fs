@@ -68,6 +68,8 @@ type MoveOrigin =
 
 type MovingModel = MoveOrigin * Card list * Point * string option * int
 
+type MoveModel = MoveModel of MoveOrigin * Point
+
 type Model = {
     won : bool
     stock : Card list
@@ -84,7 +86,7 @@ type Model = {
     diamondsFoundation : Card list
     clubsFoundation : Card list
     moving : MovingModel option
-    pendingMove : MoveOrigin option
+    pendingMove : MoveModel option
     rng : System.Random
     popReady : bool
     pendingGestures : PendingGesture list
