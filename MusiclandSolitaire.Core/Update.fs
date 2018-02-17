@@ -245,37 +245,40 @@ let rec processMessage msg model =
             |> returnModel
 
         | BeginMove (origin, count, pos, id) ->
-            let pileSound = List.head >> snd >> getFaceContent >> Some
-            let tableauSound = (fun n -> List.take n >> List.last >> snd >> getFaceContent >> Some)
-            let susSound = Option.map (fun s -> s + "_Sus")
-            
-            let cardsInPile, pickCards, sound, moving =
-                match model.moving,origin,count with
-                | None, Pile pile, 1 when pile <> Stock ->
-                    let cardsInPile = getPile pile model
-                    let pickCards = flip (setPile pile)
-                    let sound = pileSound cardsInPile
-                    cardsInPile, pickCards, sound, Some (origin,(List.take 1 cardsInPile),pos,susSound sound, id) 
+            if model.moving = None then
+                let pileSound = List.head >> snd >> getFaceContent >> Some
+                let tableauSound = (fun n -> List.take n >> List.last >> snd >> getFaceContent >> Some)
+                let susSound = Option.map (fun s -> s + "_Sus")
+                
+                let cardsInPile, pickCards, sound, moving =
+                    match model.moving,origin,count with
+                    | None, Pile pile, 1 when pile <> Stock ->
+                        let cardsInPile = getPile pile model
+                        let pickCards = flip (setPile pile)
+                        let sound = pileSound cardsInPile
+                        cardsInPile, pickCards, sound, Some (origin,(List.take 1 cardsInPile),pos,susSound sound, id) 
 
-                | None, Tableau tableau, n when n <= (getTableau tableau model |> faceUp |> List.length) && n > 0 ->
-                    let cardsInTableau = getTableau tableau model |> faceUp
-                    let pickCards = setTableauFaceUp tableau
-                    let sound = tableauSound n cardsInTableau
-                    cardsInTableau, pickCards, sound, Some (origin,(List.take n cardsInTableau),pos,susSound sound, id) 
+                    | None, Tableau tableau, n when n <= (getTableau tableau model |> faceUp |> List.length) && n > 0 ->
+                        let cardsInTableau = getTableau tableau model |> faceUp
+                        let pickCards = setTableauFaceUp tableau
+                        let sound = tableauSound n cardsInTableau
+                        cardsInTableau, pickCards, sound, Some (origin,(List.take n cardsInTableau),pos,susSound sound, id) 
 
-                | _ -> [], idFunc2, None, None
+                    | _ -> [], idFunc2, None, None
 
-            let model = { pickCards model (List.skip count cardsInPile) with moving = moving }
+                let model = { pickCards model (List.skip count cardsInPile) with moving = moving }
 
-            match sound with
-            | None -> returnModel model
-            | (Some sound) -> 
-                model,
-                [
-                    Cmd (PlaySound (sound + "_Sus",SoundMode.Overlap,0.5))
-                    Cmd (Delay (1.0, wrapOperation processMessage (Msg HandleMovingSound)))
-                    Msg HandleMovingSound
-                ]
+                match sound with
+                | None -> returnModel model
+                | (Some sound) -> 
+                    model,
+                    [
+                        Cmd (PlaySound (sound + "_Sus",SoundMode.Overlap,0.5))
+                        Cmd (Delay (1.0, wrapOperation processMessage (Msg HandleMovingSound)))
+                        Msg HandleMovingSound
+                    ]
+            else
+                returnModel model
 
         | Move (tid, Delta (x,y)) ->
             match model.moving with
@@ -303,9 +306,10 @@ let rec processMessage msg model =
                 | _,Pile Stock | _,Pile Talon -> model, [ Msg (CancelMove id)]
 
                 | [card],Pile pile when canPlaceOnFoundation (getPile pile model) (getSuit pile) card ->
+                    let face = (snd card)
                     { pushCardToPile pile card model with moving = None },
                         [ 
-                            Cmd (PlaySound ((getFaceContent (snd card)),NoOverlap,1.0))
+                            Cmd (PlaySound ((getFaceContent face),(if face = KeySignature then NoOverlap else SoundMode.Overlap),1.0))
                             Msg MoveCommitted
                         ]
                         
@@ -330,7 +334,7 @@ let rec processMessage msg model =
                 |> modifyTableau Tableau7 replenish
                 |> returnModel
 
-        | CardTapped (_,face) -> model,[Cmd (PlaySound (getFaceContent face,NoOverlap,1.0))]
+        | CardTapped (_,face) -> model,[Cmd (PlaySound (getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0))]
 
         | FlipTalon -> 
             model

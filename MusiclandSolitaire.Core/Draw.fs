@@ -220,7 +220,7 @@ let foundations model =
     @ faceUpPile model.diamondsFoundation DiamondsFoundation (Point diamondsFoundationPosition)
     @ faceUpPile model.clubsFoundation ClubsFoundation (Point clubsFoundationPosition)
 
-let rec drawFannedPile pile getTextures position touchDown touchUp tapped =
+let rec drawFannedPile pile getTextures position dragged touchUp tapped =
     match pile,position with
     | [],_ -> []
     | ((suit, face) :: tail),Point (x,y) ->
@@ -230,13 +230,13 @@ let rec drawFannedPile pile getTextures position touchDown touchUp tapped =
           , 1.0
           , {
             tapHandler = tapped face suit
-            touchDownHandler = touchDown pile position
+            touchDownHandler = None
             touchUpHandler = touchUp pile
-            dragHandler = None
+            dragHandler = dragged pile position
             stopTouchPropagation = true
             overlapHandler = None
             }
-          ) :: (drawFannedPile tail getTextures (Point (x,y+32.0)) touchDown touchUp tapped)
+          ) :: (drawFannedPile tail getTextures (Point (x,y+32.0)) dragged touchUp tapped)
 
 let tableau tableau (x,y) model =
     let (Tableau.Tableau (up, down)) = getTableau tableau model
@@ -251,7 +251,7 @@ let tableau tableau (x,y) model =
         (List.rev up)
         cardFront
         (Point (x,(y + 32.0 * (float)(List.length down))))
-        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun id _ -> BeginMove (Tableau tableau,x,pos,id))) | _ -> None)
+        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun id _ _ -> BeginMove (Tableau tableau,x,pos,id))) | _ -> None)
         (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun id _ -> CommitMove (Tableau tableau,id)) | _ -> None)
         (fun suit face -> (handler (CardTapped (face,suit))))
 
