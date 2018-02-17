@@ -1,6 +1,7 @@
 ﻿module Draw
 
 open Core
+open FsGame
 open Model
 open Update
 
@@ -149,18 +150,18 @@ let reset =
 let drawPile pile getTextures position touchDown dragged touchUp tapped =
     match pile with
     | [] -> []
-    | (suit, face)::_ -> 
+    | card :: _ -> 
         [Sprite
-          ( getTextures suit face
+          ( getTextures card
           , position
           , 1.0
           , {
-            id = TagId.Card (suit, face)
+            id = TagId.Nothing
             position = position
             tapHandler = 
                 optional { 
                     let! f = tapped
-                    return! f suit face 
+                    return! f card
                     }
             touchDownHandler = touchDown
             touchUpHandler = touchUp
@@ -171,9 +172,9 @@ let drawPile pile getTextures position touchDown dragged touchUp tapped =
           )
         ]
 
-let cardBack _ _ = ["CardBack"]
+let cardBack _ = ["CardBack"]
 
-let cardFront suit face = [getFaceContent face; getSuitContent suit]
+let cardFront (Card ( suit , face ) ) = [getFaceContent face; getSuitContent suit]
 
 let stock model =
     drawPile
@@ -183,18 +184,18 @@ let stock model =
         (handler PreparePop)
         None
         None
-        (handler (if model.popReady then handler PopStock else None))
+        (Some (fun _ -> if model.popReady then handler PopStock else None))
 
 
-let faceUpPile cards pile position =
+let faceUpPile cards origin position =
     drawPile
         cards
         cardFront
         position
-        (Some (fun id _ -> BeginMove (Pile pile,1,position,id)))
+        (Some (fun id _ -> BeginMove (origin,1,position,id)))
         None
         (Some (fun id _ -> CommitMove id))
-        (Some (fun suit face -> handler (CardTapped ((suit,face)))))
+        (Some (fun card -> handler (CardTapped card)))
 
 let talon model =
     faceUpPile
@@ -203,20 +204,20 @@ let talon model =
         (Point talonPosition)
 
 let foundations model =
-    faceUpPile model.heartsFoundation HeartsFoundation (Point heartsFoundationPosition)
-    @ faceUpPile model.spadesFoundation SpadesFoundation (Point spadesFoundationPosition)
-    @ faceUpPile model.diamondsFoundation DiamondsFoundation (Point diamondsFoundationPosition)
-    @ faceUpPile model.clubsFoundation ClubsFoundation (Point clubsFoundationPosition)
+    faceUpPile (cardsInFoundation model.heartsFoundation) (MoveOrigin.Foundation Hearts) (Point heartsFoundationPosition)
+    @ faceUpPile (cardsInFoundation model.spadesFoundation) (MoveOrigin.Foundation Spades) (Point spadesFoundationPosition)
+    @ faceUpPile (cardsInFoundation model.diamondsFoundation) (MoveOrigin.Foundation Diamonds) (Point diamondsFoundationPosition)
+    @ faceUpPile (cardsInFoundation model.clubsFoundation) (MoveOrigin.Foundation Clubs) (Point clubsFoundationPosition)
 
-let drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y) =
+let drawFannedPileCard getTextures card tapped touchUp dragged pile (x,y) =
     Sprite
-      ( getTextures suit face
+      ( getTextures card
       , Point (x,y)
       , 1.0
       , {
-        id = TagId.Card (suit, face)
+        id = TagId.Nothing
         position = Point (x,y)
-        tapHandler = tapped face suit
+        tapHandler = tapped card
         touchDownHandler = None
         touchUpHandler = touchUp pile
         dragHandler = dragged pile (Point (x,y))
@@ -226,7 +227,7 @@ let drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y) =
       ) 
 
 let movingOverlap movingFace = function
-| Overlap ({id = TagId.Target ((_,face), target); position = point },box) when area box > 4000.0 ->
+| Overlap ({id = TagId.Target (Card (_,face), target); position = point },box) when area box > 4000.0 ->
     StageMove ( face, target, point ) |> Some
 
 | Overlap ({id = TagId.Target (_, target) },box) ->
@@ -238,36 +239,36 @@ let movingOverlap movingFace = function
 let rec drawFannedPile pile getTextures position dragged touchUp tapped topArea =
     match pile,position with
     | [],_ -> []
-    | ((suit, face) :: []),Point (x,y) -> 
-        drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y)
-        :: topArea ( Point ( x, y + cardSpacing ) ) suit face
-    | ((suit, face) :: tail),Point (x,y) -> 
-        drawFannedPileCard getTextures suit face tapped touchUp dragged pile (x,y)
+    | (card :: []),Point (x,y) -> 
+        drawFannedPileCard getTextures card tapped touchUp dragged pile (x,y)
+        :: topArea ( Point ( x, y + cardSpacing ) ) card
+    | (card :: tail),Point (x,y) -> 
+        drawFannedPileCard getTextures card tapped touchUp dragged pile (x,y)
         :: drawFannedPile tail getTextures ( Point ( x, y + cardSpacing ) ) dragged touchUp tapped topArea
 
 let tableau tableau (x,y) model =
-    let (Tableau.Tableau (up, down)) = getTableau tableau model
+    let (Tableau (up, down)) = getTableau tableau model
     drawFannedPile 
         down
         cardBack
         (Point (x,y))
         (fun _ _ -> None)
         (fun _ -> None)
-        (fun _ _ -> None)
-        (fun _ _ _ -> [])
+        (fun _ -> None)
+        (fun _ _ -> [])
     @ drawFannedPile
         (List.rev up)
         cardFront
         (Point (x,(y + cardSpacing * (float)(List.length down))))
-        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun id _ _ -> BeginMove (Tableau tableau,x,pos,id))) | _ -> None)
+        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun id _ _ -> BeginMove (MoveOrigin.Tableau tableau,x,pos,id))) | _ -> None)
         (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun id _ -> CommitMove id) | _ -> None)
-        (fun suit face -> (handler (CardTapped (face,suit))))
-        (fun pos suit face -> 
+        (CardTapped >> handler)
+        (fun pos card -> 
             [Area 
               ( "CardBack"
               , pos
               , { 
-                id = TagId.Target ( ( suit, face ), Tableau tableau )
+                id = TagId.Target ( card , MoveTarget.Tableau tableau )
                 position = pos
                 tapHandler = None
                 touchDownHandler = None
@@ -310,7 +311,7 @@ let moving model =
             touchUpHandler = None
             dragHandler = None
             stopTouchPropagation = false
-            overlapHandler = bottom |> fst |> movingOverlap |> Some
+            overlapHandler = bottom |> face |> movingOverlap |> Some
             } 
           )
         :: drawFannedPile
@@ -319,8 +320,8 @@ let moving model =
             position
             (fun _ _ -> None)
             (fun _ -> None)
-            (fun _ _ -> None)
-            (fun _ _ _ -> [])
+            (fun _ -> None)
+            (fun _ _ -> [])
 
 let draw model =
     background

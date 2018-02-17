@@ -3,7 +3,7 @@
 open Core
 open Touch
 open Model
-
+open FsGame
 
 
 //
@@ -18,7 +18,7 @@ let rec deal cards =
 
             match tableauDealMoves with
             | [] ->
-                do! model |> pushCardToPile Stock card |> setModel |> State.modify
+                do! model |> pushCardToStock card |> setModel |> State.modify
 
             | (tableau, faceUp) :: moves ->
                 do! setTableauDealMoves moves |> State.modify
@@ -31,8 +31,8 @@ let initModel rng =
 
     let model = {
         won = false
-        stock = initPile
-        talon = initPile
+        stock = []
+        talon = []
         tableau1 = initTableau
         tableau2 = initTableau
         tableau3 = initTableau
@@ -40,10 +40,10 @@ let initModel rng =
         tableau5 = initTableau
         tableau6 = initTableau
         tableau7 = initTableau
-        heartsFoundation = initPile
-        spadesFoundation = initPile
-        diamondsFoundation = initPile
-        clubsFoundation = initPile
+        heartsFoundation = initFoundation Hearts
+        spadesFoundation = initFoundation Spades
+        diamondsFoundation = initFoundation Diamonds
+        clubsFoundation = initFoundation Clubs
         moving = None
         rng = rng
         popReady = false
@@ -54,7 +54,7 @@ let initModel rng =
         }
 
     let deck = 
-        [for suit in suits do for face in faces do yield suit,face]
+        [ for suit in suits do for face in faces do yield Card ( suit , face ) ]
         |> Array.ofList
         |> shuffleArr rng
         |> List.ofArray
@@ -95,12 +95,12 @@ let getSuitContent suit =
 //
 
 type TagId =
+    | Nothing
     | Background
     | FlipTalon
     | Reset
-    | Card of Card
     | MovingBottom of Card
-    | Target of Card * MoveOrigin
+    | Target of Card * MoveTarget
 
 type Msg =
     | Step
@@ -109,8 +109,8 @@ type Msg =
     | BeginMove of MoveOrigin * int * Point * int
     | Move of int * Delta
     | CancelMove of int
-    | StageMove of Face * MoveOrigin * Point
-    | UnstageMove of MoveOrigin
+    | StageMove of Face * MoveTarget * Point
+    | UnstageMove of MoveTarget
     | CommitMove of int
     | MoveCommitted
     | Reset
@@ -286,12 +286,16 @@ let rec processMessage msg model gameTime =
                 
                 let cardsInPile, pickCards, moving =
                     match model.moving,origin,count with
-                    | None, Pile pile, 1 when pile <> Stock ->
-                        let cardsInPile = getPile pile model
-                        let pickCards = flip (setPile pile)
-                        cardsInPile, pickCards, Some (origin,(List.take 1 cardsInPile),pos, id) 
+                    | None , MoveOrigin.Talon , 1 ->
+                        let pickCards = (fun model cards -> { model with talon = cards })
+                        model.talon, pickCards, Some (origin,(List.take 1 model.talon),pos, id) 
 
-                    | None, Tableau tableau, n when n <= (getTableau tableau model |> faceUp |> List.length) && n > 0 ->
+                    | None , MoveOrigin.Foundation foundation , 1 ->
+                        let cardsInFoundation = getFoundation foundation model |> cardsInFoundation
+                        let pickCards = flip (setFoundation foundation)
+                        cardsInFoundation, pickCards, Some (origin,(List.take 1 cardsInFoundation),pos, id) 
+
+                    | None, MoveOrigin.Tableau tableau, n when n <= (getTableau tableau model |> faceUp |> List.length) && n > 0 ->
                         let cardsInTableau = getTableau tableau model |> faceUp
                         let pickCards = setTableauFaceUp tableau
                         cardsInTableau, pickCards, Some (origin,(List.take n cardsInTableau),pos, id) 
@@ -316,11 +320,17 @@ let rec processMessage msg model gameTime =
 
 
         | CancelMove tid ->
+
             let returnCardsToOrigin =
                 match model.moving with
-                | Some (Pile pile,cards,_,id) when id = tid -> modifyPile pile ((@) cards)
+                | Some ( MoveOrigin.Talon , cards , _ , id ) when id = tid -> 
+                    (@) cards |> modifyTalon
 
-                | Some (Tableau tableau,cards,_,id) when id = tid -> modifyTableauFaceUp tableau ((@) cards)
+                | Some ( MoveOrigin.Foundation foundation , cards , _ , id ) when id = tid -> 
+                    (@) cards |> modifyFoundation foundation 
+
+                | Some ( MoveOrigin.Tableau tableau , cards , _ , id ) when id = tid -> 
+                    (@) cards |> modifyTableauFaceUp tableau 
 
                 | _ -> idFunc
 
@@ -333,8 +343,8 @@ let rec processMessage msg model gameTime =
 
         | StageMove ( face, target, point ) ->
             match model.moving, model.pendingMove, model.unstaging with
-            | Some (_,cards,movingPos,_) , None, None -> 
-                let movingFace = List.last cards |> snd
+            | Some ( _ , cards , movingPos , _ ) , None, None -> 
+                let movingFace = List.last cards |> Model.face
                 { model with pendingMove = MoveModel ( target, movingPos, point, 0.0 ) |> Some }
                 , [
                   PlaySound ( getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 )
@@ -360,17 +370,16 @@ let rec processMessage msg model gameTime =
             | Some (_,cards,_,id), Some ( MoveModel ( target, _, _, _ ) ) when tid = id ->
 
                 match cards,target with
-                | _,Pile Stock | _,Pile Talon -> model, [ Msg (CancelMove id)]
 
-                | [card],Pile pile when canPlaceOnFoundation (getPile pile model) (getSuit pile) card ->
-                    let face = (snd card)
-                    pushCardToPile pile card model,
+                | [card] , MoveTarget.Foundation foundation when canPlaceOnFoundation (getFoundation foundation model) card ->
+                    let face = face card
+                    pushCardToFoundation foundation card model,
                         [ 
                             Cmd (PlaySound ((getFaceContent face),(if face = KeySignature then NoOverlap else SoundMode.Overlap),1.0))
                             Msg MoveCommitted
                         ]
                         
-                | cards,Tableau tableau when canPlaceOnTableau (getTableau tableau model |> faceUp) cards ->
+                | cards , MoveTarget.Tableau tableau when canPlaceOnTableau (getTableau tableau model |> faceUp) cards ->
                     modifyTableauFaceUp tableau ((@) cards) model, [Msg MoveCommitted]
 
                 | _ -> model,[Msg (CancelMove id)]
@@ -387,7 +396,7 @@ let rec processMessage msg model gameTime =
                     pendingMove = None
                     unstaging = None }
 
-            if [model.heartsFoundation;model.spadesFoundation;model.diamondsFoundation;model.clubsFoundation] |> List.map List.length = [12;12;12;12]
+            if suits |> List.map ((flip getFoundation) model) |> List.map cardsInFoundation |> List.map List.length = [12;12;12;12]
             then
                 { model with won = true }, [Cmd (Delay (1.0,wrapOperation processMessage (Cmd (PlaySound ("Stack",NoOverlap,1.0)))))]
             else 
@@ -401,14 +410,14 @@ let rec processMessage msg model gameTime =
                 |> returnModel
 
 
-        | CardTapped (_,face) -> model,[Cmd (PlaySound (getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0))]
+        | CardTapped ( Card ( _ , face ) ) -> model,[Cmd (PlaySound (getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0))]
 
 
         | FlipTalon -> 
-            model
-            |> setPile Talon []
-            |> setPile Stock (List.rev model.talon)
-            |> returnModel
+            returnModel
+                { model with
+                    talon = []
+                    stock = List.rev model.talon }
 
 
 let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =

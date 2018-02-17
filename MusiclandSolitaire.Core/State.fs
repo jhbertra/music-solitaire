@@ -30,6 +30,18 @@ let inline bind f x =
 let inline map f = f >> fromValue |> bind
 
 
+let get = State (fun s -> (s,s))
+
+
+let inline put newState = State (fun s -> ((), newState))
+
+
+let inline modify f = get |> bind (f >> put)
+
+
+let inline gets f = get |> map f
+
+
 let inline (<+>) s1 s2 = 
     create ( fun s ->
         let result , s = run s s1
@@ -40,6 +52,9 @@ let inline (<*>) sf sa =  sf |> ( (flip map) sa |> bind )
 
 
 let inline (<!>) f sa = (fromValue f) <*> sa
+
+
+let inline (<?>) sf a = sf <*> (fromValue a)
 
 
 type StateBuilder() =
@@ -72,23 +87,3 @@ type StateBuilder() =
 
 
 let builder = StateBuilder()
-
-
-let get = State (fun s -> (s,s))
-
-
-let inline put newState = State (fun s -> ((), newState))
-
-
-let inline modify f =
-    builder {
-        let! x = get
-        do! put (f x)
-    }
-
-
-let inline gets f =
-    builder {
-        let! x = get
-        return f x
-    }

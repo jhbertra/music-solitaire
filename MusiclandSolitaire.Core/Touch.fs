@@ -1,6 +1,7 @@
 ﻿module Touch
 
 open Core
+open FsGame
 
 type GestureSample = GestureSample of GameTime * Touch
 
@@ -26,7 +27,8 @@ let touchEvent gameTime = function
     | _ -> []
 
 let touchEvents previousTouches newTouches gameTime =
-    fullJoin previousTouches newTouches id id 
+    let length = List.length newTouches
+    fullJoin previousTouches newTouches FsGame.getId FsGame.getId
     |> List.collect (touchEvent gameTime)
 
 type PendingGestureType =

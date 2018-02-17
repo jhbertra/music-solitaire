@@ -1,5 +1,7 @@
 ﻿module MusicSolitaireGame
 
+open FsGame
+
 open Microsoft.Xna.Framework.Graphics
 open Microsoft.Xna.Framework.Audio
 open Microsoft.Xna.Framework.Input.Touch

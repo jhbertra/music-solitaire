@@ -1,6 +1,7 @@
 module Engine
 
 open Core
+open FsGame
 open Update
 open Draw
 
