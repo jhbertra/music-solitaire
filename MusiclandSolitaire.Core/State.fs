@@ -1,5 +1,7 @@
 ﻿module State
 
+open Core
+
 
 type State<'s,'v> = State of ('s -> 'v * 's)
 
@@ -19,16 +21,25 @@ let inline eval initial = run initial >> fst
 let inline exec initial = run initial >> snd
 
 
-let inline bind x f = 
+let inline bind f x = 
     create ( fun s -> 
         let result , s = run s x
         f result |> run s )
+
+
+let inline map f = f >> fromValue |> bind
 
 
 let inline (<+>) s1 s2 = 
     create ( fun s ->
         let result , s = run s s1
         run s s2 )
+
+
+let inline (<*>) sf sa =  sf |> ( (flip map) sa |> bind )
+
+
+let inline (<!>) f sa = (fromValue f) <*> sa
 
 
 type StateBuilder() =
@@ -39,7 +50,7 @@ type StateBuilder() =
 
     member inline this.ReturnFrom x = x
 
-    member inline this.Bind ( x , f ) = bind x f
+    member inline this.Bind ( x , f ) = bind f x
 
     member inline this.Combine (x1, x2) = x1 <+> x2
 
