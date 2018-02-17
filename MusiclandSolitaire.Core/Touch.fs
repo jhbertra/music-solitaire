@@ -3,41 +3,29 @@
 open Core
 open FsGame
 
+//
+// --------- Types ---------
+//
+
 type GestureSample = GestureSample of GameTime * Touch
 
-let gestureSample gameTime touch  = GestureSample (gameTime, touch)
 
 type TouchEventType =
     | TouchDown of Point
     | TouchMoved of Point
     | TouchUp of Point
 
+
 type TouchEvent = int * GameTime * TouchEventType
 
-let touchEvent gameTime = function
-    | (Some (Touch _)),(Some (Touch (id,pos))) ->
-        [id,gameTime,TouchMoved pos]
-
-    | (Some (Touch (id,pos))),None ->
-        [id,gameTime,TouchUp pos]
-
-    | None,(Some (Touch (id,pos))) ->
-        [id,gameTime,TouchDown pos]
-
-    | _ -> []
-
-let touchEvents previousTouches newTouches gameTime =
-    let length = List.length newTouches
-    fullJoin previousTouches newTouches FsGame.getId FsGame.getId
-    |> List.collect (touchEvent gameTime)
 
 type PendingGestureType =
     | Tap of GameTime * Point
     | Drag of Point
 
+
 type PendingGesture = int * PendingGestureType
 
-type Delta = Delta of float*float
 
 type GestureType =
     | TouchDown of Point
@@ -45,17 +33,53 @@ type GestureType =
     | Tap of Point
     | Drag of Point * Delta
 
+
 type Gesture = int * GestureType
+
 
 type EventProcessResult =
     | PendingGesture of PendingGesture
     | Gesture of Gesture
 
-let distance (Point (x1,y1)) (Point (x2,y2)) = sqrt ((x2 - x1)**2.0 + (y2 - y1)**2.0)
 
-let subtract (Point (x1,y1)) (Point (x2,y2)) = Delta (x2 - x1, y2 - y1)
+
+
+//
+// --------- Functions ---------
+//
+
 
 let dragThreshold = 5.0
+
+
+let gestureSample gameTime touch  = GestureSample ( gameTime , touch )
+
+
+let id ( Touch ( id , _ ) ) = id
+
+
+let position ( Touch ( _ , pos ) ) = pos
+
+
+let touchEvent gameTime = function
+    | ( Some ( Touch _ ) ),( Some ( Touch ( id , pos ) ) ) ->
+        [ id, gameTime, TouchEventType.TouchMoved pos ]
+
+    | (Some (Touch (id,pos))),None ->
+        [ id, gameTime, TouchEventType.TouchUp pos ]
+
+    | None,(Some (Touch (id,pos))) ->
+        [ id, gameTime, TouchEventType.TouchDown pos ]
+
+    | _ -> []
+
+
+
+let touchEvents previousTouches newTouches gameTime =
+    let length = List.length newTouches
+    fullJoin previousTouches newTouches id id
+    |> List.collect (touchEvent gameTime)
+
 
 let processEvent = function
     | _,(Some (id,gameTime,TouchEventType.TouchDown position)) -> 
@@ -110,10 +134,13 @@ let processEvent = function
 
     | _ -> [] 
 
+
 let processEvents (previousPending : PendingGesture list) (events : TouchEvent list) = 
     fullJoin previousPending events fst (fun (id,_,_) -> id) 
     |> List.collect processEvent
 
+
 let gestures = List.collect (function Gesture x -> [x] | _ -> [])
+
 
 let pendingGestures = List.collect (function PendingGesture x -> [x] | _ -> [])

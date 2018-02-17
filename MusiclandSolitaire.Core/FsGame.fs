@@ -28,6 +28,9 @@ type GameTime = {
 type Point = Point of float*float
 
 
+type Delta = Delta of float*float
+
+
 type Touch = Touch of int * Point
 
 
@@ -88,10 +91,7 @@ let area ( BoundingBox ( _, _, w, h ) ) = w * h
 let bounds { box = BoundingBox (x,y,w,h) } = x,y,w,h
 
 
-let getId (Touch (id,_)) = id
-
-
-let getPosition (Touch (_,pos)) = pos
+let distance (Point (x1,y1)) (Point (x2,y2)) = sqrt ((x2 - x1)**2.0 + (y2 - y1)**2.0)
 
 
 let intersect (BoundingBox (xa,ya,wa,ha)) (BoundingBox (xb,yb,wb,hb)) =
@@ -112,6 +112,9 @@ let intersect (BoundingBox (xa,ya,wa,ha)) (BoundingBox (xb,yb,wb,hb)) =
 
 
 let lerp ( Point ( x1, y1 ) ) ( Point ( x2, y2 ) ) t = Point ( (x2 - x1) * t + x1, (y2 - y1) * t + y1 )
+
+
+let subtract (Point (x1,y1)) (Point (x2,y2)) = Delta (x2 - x1, y2 - y1)
 
 
 let union (BoundingBox (xa,ya,wa,ha)) (BoundingBox (xb,yb,wb,hb)) = 
