@@ -1,4 +1,4 @@
-﻿module FsGame
+﻿module FsGame.Platform
 
 open System
 
@@ -129,3 +129,12 @@ let union (BoundingBox (xa,ya,wa,ha)) (BoundingBox (xb,yb,wb,hb)) =
     let wc = x1c - xc
     let hc = y1c - yc
     BoundingBox (xc, yc, wc, hc)
+
+
+let pointInBox (Point (x,y)) (BoundingBox (xb,yb,w,h)) =
+    let xpb = x - xb
+    let ypb = y - yb
+    if xpb >= 0.0 && xpb <= w && ypb >= 0.0 && ypb <= h then
+        Some (Point (xpb,ypb))
+    else
+        None

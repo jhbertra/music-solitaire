@@ -11,10 +11,10 @@
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Core.fs" />
     <Compile Include="$(MSBuildThisFileDirectory)State.fs" />
-    <Compile Include="$(MSBuildThisFileDirectory)FsGame.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)FsGame.Platform.fs" />
     <Compile Include="$(MSBuildThisFileDirectory)Touch.fs" />
     <Compile Include="$(MSBuildThisFileDirectory)Model.fs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Update.fs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UseCases.fs" />
     <Compile Include="$(MSBuildThisFileDirectory)Draw.fs" />
     <Compile Include="$(MSBuildThisFileDirectory)Engine.fs" />
   </ItemGroup>

@@ -2,7 +2,7 @@
 
 open Core
 open Touch
-open FsGame
+open FsGame.Platform
 
 //
 // --------- Types ---------
@@ -65,7 +65,7 @@ type Staging =
     | Unstaging of Point * float
 
 
-type MovingModel = MoveOrigin * Card list * Point * int * Staging option
+type Hand = MoveOrigin * Card list * Point * int * Staging option
 
 
 type Model = {
@@ -83,7 +83,7 @@ type Model = {
     spadesFoundation : Foundation
     diamondsFoundation : Foundation
     clubsFoundation : Foundation
-    moving : MovingModel option
+    hand : Hand option
     rng : System.Random
     popReady : bool
     pendingGestures : PendingGesture list
@@ -95,6 +95,51 @@ type DealState = {
     tableauDealMoves : (TableauNumber * bool) list
     model : Model
     }
+
+
+
+//
+// --------- Msg ---------
+//
+
+type TagId =
+    | Nothing
+    | Background
+    | FlipTalon
+    | Reset
+    | MovingBottom of Card
+    | Target of Card * MoveTarget
+
+type Msg =
+    | Step
+    | PreparePop
+    | PopStock
+    | BeginMove of MoveOrigin * int * Point * int
+    | Move of int * Delta
+    | CancelMove
+    | StageMove of Face * MoveTarget * Point
+    | UnstageMove of MoveTarget
+    | CommitMove of int
+    | MoveCommitted
+    | Reset
+    | CardTapped of Card
+    | FlipTalon
+
+type Tag = {
+    id : TagId
+    position : Point
+    tapHandler : (int -> Point -> Msg) option
+    touchDownHandler : (int -> Point -> Msg) option
+    touchUpHandler : (int -> Point -> Msg) option
+    dragHandler : (int -> Delta -> Point -> Msg) option
+    stopTouchPropagation : bool
+    overlapHandler : (Overlap -> Msg option) option
+}
+and Overlap = Overlap of Tag * BoundingBox
+
+type Operation =
+    | Msg of Msg
+    | Cmd of Cmd<Model, Tag>
 
 
 
@@ -267,3 +312,27 @@ let canPlaceOnTableau tableau cards =
 
 
 let replenish = asTableauModifier (function | [],(head :: tail) -> [head],tail | x -> x)
+
+
+let getFaceContent face =
+    match face with
+        | KeySignature -> "Ks"
+        | Do -> "Do"
+        | Re -> "Re"
+        | Mi -> "Mi"
+        | Fa -> "Fa"
+        | So -> "So"
+        | La -> "La"
+        | Ti -> "Ti"
+        | Do8 -> "Do8"
+        | IV -> "IV"
+        | V -> "V"
+        | I -> "I"
+
+
+let getSuitContent suit =
+    match suit with
+        | Hearts -> "Hearts"
+        | Spades -> "Spades"
+        | Diamonds -> "Diamonds"
+        | Clubs -> "Clubs"

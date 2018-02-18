@@ -1,7 +1,7 @@
 ﻿module Touch
 
 open Core
-open FsGame
+open FsGame.Platform
 
 //
 // --------- Types ---------

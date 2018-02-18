@@ -1,6 +1,6 @@
-﻿module MusicSolitaireGame
+﻿module FsGame.iOS
 
-open FsGame
+open FsGame.Platform
 
 open Microsoft.Xna.Framework.Graphics
 open Microsoft.Xna.Framework.Audio
@@ -20,7 +20,7 @@ let getTouches (touchCol: TouchCollection) =
     |> List.map (fun touch -> 
         Touch (touch.Id,touch.Position |> vector2ToFloatTuple |> mapT2 ((flip (/)) scale) |> Point ))
 
-type Game<'m, 't>(engine : GameEngine<'m, 't>) as this =
+type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
     inherit Microsoft.Xna.Framework.Game()
 
     let _ = new Microsoft.Xna.Framework.GraphicsDeviceManager(this)

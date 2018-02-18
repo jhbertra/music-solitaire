@@ -3,9 +3,8 @@
 open UIKit
 open Foundation
 
-open MusicSolitaireGame
+open FsGame.iOS
 open Model
-open Update
 open Engine
 
 [<Register ("AppDelegate")>]
@@ -13,6 +12,6 @@ type AppDelegate () =
     inherit UIApplicationDelegate ()
 
     override __.FinishedLaunching (_, _) =
-        let game = new Game<Model, Tag>(engine(System.Random()))
+        let game = new FsGame<Model, Tag>(engine(System.Random()))
         game.Run()
         true

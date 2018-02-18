@@ -94,5 +94,3 @@ let applyT2 f arg1 arg2 = f (arg1, arg2)
 let flip f a1 a2 = f a2 a1
 
 let idFunc x = x
-
-let idFunc2 x _ = x

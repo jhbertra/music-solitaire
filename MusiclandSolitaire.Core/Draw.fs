@@ -1,9 +1,8 @@
 ﻿module Draw
 
 open Core
-open FsGame
+open FsGame.Platform
 open Model
-open Update
 
 //
 // --------- Content Declarations ---------
@@ -76,6 +75,7 @@ let clubsFoundationPosition = 332.0,56.0
 let talonPosition = 536.0,56.0
 let stockPosition = 638.0,56.0
 
+
 // Bottom Row
 let tableau1Position = 26.0,223.0
 let tableau2Position = 128.0,223.0
@@ -85,13 +85,24 @@ let tableau5Position = 434.0,223.0
 let tableau6Position = 536.0,223.0
 let tableau7Position = 638.0,223.0
 
+
 let cardSpacing = 32.0
+
 
 let withinBox (Point (x,y)) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
 
+
 let handleTouchUp id _ = CommitMove id
 
+
 let handler msg = Some (fun _ _ -> msg)
+
+
+let cardBack = ["CardBack"]
+
+
+let cardFront (Card ( suit , face ) ) = [getFaceContent face; getSuitContent suit]
+
 
 let background =
     let position = Point (0.0, 0.0)
@@ -111,6 +122,7 @@ let background =
         }
       )
 
+
 let flipTalon =
     let position = Point (let sx,sy = stockPosition in (sx + 18.0,sy + 30.0))
     Sprite
@@ -128,6 +140,7 @@ let flipTalon =
         overlapHandler = None
         }
       )
+
 
 let reset =
     let position = Point (26.0,1252.0)
@@ -147,122 +160,113 @@ let reset =
         }
       )
 
-let drawPile pile getTextures position touchDown dragged touchUp tapped =
+
+let drawCard position faceUp tapHandler touchDownHandler touchUpHandler dragHandler card =
+  Sprite
+    ( if faceUp then cardFront card else cardBack
+    , position
+    , 1.0
+    , {
+      id = TagId.Nothing
+      position = position
+      tapHandler = tapHandler
+      touchDownHandler = touchDownHandler
+      touchUpHandler = touchUpHandler
+      dragHandler = dragHandler
+      stopTouchPropagation = true
+      overlapHandler = None
+      }
+    )
+
+
+let drawPile pile sprite =
     match pile with
     | [] -> []
-    | card :: _ -> 
-        [Sprite
-          ( getTextures card
-          , position
-          , 1.0
-          , {
-            id = TagId.Nothing
-            position = position
-            tapHandler = 
-                optional { 
-                    let! f = tapped
-                    return! f card
-                    }
-            touchDownHandler = touchDown
-            touchUpHandler = touchUp
-            dragHandler = dragged
-            stopTouchPropagation = true
-            overlapHandler = None
-            }
-          )
-        ]
+    | card :: _ -> [sprite card]
 
-let cardBack _ = ["CardBack"]
-
-let cardFront (Card ( suit , face ) ) = [getFaceContent face; getSuitContent suit]
 
 let stock model =
-    drawPile
-        model.stock
-        cardBack
-        (Point stockPosition)
-        (handler PreparePop)
+    drawCard
+        ( Point stockPosition )
+        false
+        ( if model.popReady then handler PopStock else None )
+        ( handler PreparePop )
         None
         None
-        (Some (fun _ -> if model.popReady then handler PopStock else None))
+    |> drawPile model.stock
 
 
 let faceUpPile cards origin position =
     drawPile
         cards
-        cardFront
-        position
-        (Some (fun id _ -> BeginMove (origin,1,position,id)))
-        None
-        (Some (fun id _ -> CommitMove id))
-        (Some (fun card -> handler (CardTapped card)))
+        (fun card ->
+            drawCard
+                position
+                true
+                ( handler ( CardTapped card ) )
+                None
+                None
+                ( Some ( fun id _ _ -> BeginMove ( origin , 1 , position , id ) ) )
+                card
+        )
+
 
 let talon model =
     faceUpPile
         model.talon
         Talon
-        (Point talonPosition)
+        ( Point talonPosition )
+
 
 let foundations model =
-    faceUpPile (cardsInFoundation model.heartsFoundation) (MoveOrigin.Foundation Hearts) (Point heartsFoundationPosition)
-    @ faceUpPile (cardsInFoundation model.spadesFoundation) (MoveOrigin.Foundation Spades) (Point spadesFoundationPosition)
-    @ faceUpPile (cardsInFoundation model.diamondsFoundation) (MoveOrigin.Foundation Diamonds) (Point diamondsFoundationPosition)
-    @ faceUpPile (cardsInFoundation model.clubsFoundation) (MoveOrigin.Foundation Clubs) (Point clubsFoundationPosition)
-
-let drawFannedPileCard getTextures card tapped touchUp dragged pile (x,y) =
-    Sprite
-      ( getTextures card
-      , Point (x,y)
-      , 1.0
-      , {
-        id = TagId.Nothing
-        position = Point (x,y)
-        tapHandler = tapped card
-        touchDownHandler = None
-        touchUpHandler = touchUp pile
-        dragHandler = dragged pile (Point (x,y))
-        stopTouchPropagation = true
-        overlapHandler = None
-        }
-      ) 
-
-let movingOverlap movingFace = function
-| Overlap ({id = TagId.Target (Card (_,face), target); position = point },box) when area box > 4000.0 ->
-    StageMove ( face, target, point ) |> Some
-
-| Overlap ({id = TagId.Target (_, target) },box) ->
-    UnstageMove target |> Some
-
-| _ -> None
+    List.zip 
+        [ Hearts; Spades; Diamonds; Clubs ]
+        [ heartsFoundationPosition; spadesFoundationPosition; diamondsFoundationPosition; clubsFoundationPosition ]
+    |> List.collect ( fun ( suit , position ) -> faceUpPile ( getFoundation suit model |> cardsInFoundation ) ( MoveOrigin.Foundation suit ) ( Point position ) )
 
 
-let rec drawFannedPile pile getTextures position dragged touchUp tapped topArea =
-    match pile,position with
-    | [],_ -> []
-    | (card :: []),Point (x,y) -> 
-        drawFannedPileCard getTextures card tapped touchUp dragged pile (x,y)
-        :: topArea ( Point ( x, y + cardSpacing ) ) card
-    | (card :: tail),Point (x,y) -> 
-        drawFannedPileCard getTextures card tapped touchUp dragged pile (x,y)
-        :: drawFannedPile tail getTextures ( Point ( x, y + cardSpacing ) ) dragged touchUp tapped topArea
+let rec drawFannedPile pile position sprite topArea =
+    match ( pile , position ) with
+    | ( [] , _ ) -> []
 
-let tableau tableau (x,y) model =
-    let (Tableau (up, down)) = getTableau tableau model
+    | ( [ card ] , Point ( x , y ) ) -> 
+        sprite ( Point ( x , y ) ) [ card ] card
+        :: topArea ( Point ( x , y + cardSpacing ) ) card
+
+    | ( card :: tail , Point ( x , y ) ) -> 
+        sprite ( Point ( x , y ) ) ( card :: tail ) card
+        :: drawFannedPile tail ( Point ( x , y + cardSpacing ) ) sprite topArea
+
+
+let tableau tableau ( x , y ) model =
+    let ( Tableau ( up , down ) ) = getTableau tableau model
+
     drawFannedPile 
         down
-        cardBack
-        (Point (x,y))
-        (fun _ _ -> None)
-        (fun _ -> None)
-        (fun _ -> None)
-        (fun _ _ -> [])
+        ( Point ( x , y ) )
+        ( fun pos _ -> drawCard pos false None None None None )
+        ( fun _ _ -> [] )
     @ drawFannedPile
         (List.rev up)
-        cardFront
-        (Point (x,(y + cardSpacing * (float)(List.length down))))
-        (fun pile pos -> match (List.length pile),model.moving with x,None when x > 0 -> (Some (fun id _ _ -> BeginMove (MoveOrigin.Tableau tableau,x,pos,id))) | _ -> None)
-        (fun pile -> match (List.length pile),model.moving with 1,(Some _) -> Some (fun id _ -> CommitMove id) | _ -> None)
-        (CardTapped >> handler)
+        ( Point ( x ,  y + cardSpacing * (List.length down |> float) ) )
+        (fun pos pile card -> 
+            drawCard
+                pos
+                true
+                (CardTapped card |> handler)
+                None
+                None
+                ( match model.hand with
+                  | Some _ -> None
+                  | None ->
+                      let length = List.length pile
+                      if length > 0 then
+                          Some ( fun id _ _ -> BeginMove ( MoveOrigin.Tableau tableau , length , pos , id ) )
+                      else
+                          None
+                )
+                card
+        )
         (fun pos card -> 
             [Area 
               ( "CardBack"
@@ -281,6 +285,7 @@ let tableau tableau (x,y) model =
             ] 
         )
 
+
 let tableaus model =
     tableau Tableau1 tableau1Position model 
     @ tableau Tableau2 tableau2Position model 
@@ -290,8 +295,20 @@ let tableaus model =
     @ tableau Tableau6 tableau6Position model 
     @ tableau Tableau7 tableau7Position model 
 
+
+
+let movingOverlap movingFace = function
+| Overlap ({id = TagId.Target (Card (_,face), target); position = point },box) when area box > 4000.0 ->
+    StageMove ( face, target, point ) |> Some
+
+| Overlap ({id = TagId.Target (_, target) },box) ->
+    UnstageMove target |> Some
+
+| _ -> None
+
+
 let moving model =
-    match model.moving with
+    match model.hand with
     | None -> []
     | Some ( _ , cards , movingPosition , _ , staging ) ->
         let bottom = List.head cards
@@ -316,13 +333,11 @@ let moving model =
             } 
           )
         :: drawFannedPile
-            (List.rev cards)
-            cardFront
+            ( List.rev cards )
             position
-            (fun _ _ -> None)
-            (fun _ -> None)
-            (fun _ -> None)
-            (fun _ _ -> [])
+            ( fun pos _ -> drawCard pos true None None None None )
+            ( fun _ _ -> [] )
+
 
 let draw model =
     background
