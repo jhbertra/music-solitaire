@@ -49,8 +49,6 @@ let initModel rng =
         popReady = false
         pendingGestures = []
         previousTouches = []
-        pendingMove = None
-        unstaging = None
         }
 
     let deck = 
@@ -245,13 +243,41 @@ let rec processMessage msg model gameTime =
                 let step = ((float gameTime.elapsed.Milliseconds) * 0.001) * speed
                 min 1.0 (progress + step)
 
-            match model.unstaging, model.pendingMove with
-
-            | Some ( UnstagingModel ( origin, progress ) ), _ -> 
+            match model.moving with
+            | Some ( o , c , p , i , Some ( Unstaging ( origin , progress ) ) ) ->
                 let progress = move gameTime progress
-                returnModel { model with unstaging = if progress = 1.0 then None else Some ( UnstagingModel ( origin, progress ) ) }
+                let staging = 
+                    if progress = 1.0 then 
+                          None 
+                      else 
+                          Some ( Unstaging ( origin, progress ) )
 
-            | _, Some ( MoveModel ( target, origin, dest, progress ) ) -> returnModel { model with pendingMove = Some ( MoveModel ( target, origin, dest, move gameTime progress ) ) }
+                returnModel 
+                    { model with 
+                        moving = 
+                            Some 
+                              ( o 
+                              , c 
+                              , p 
+                              , i 
+                              , staging 
+                              )
+                    }
+
+            | Some ( o , c , p , i , Some ( Staged ( target, origin, dest, progress ) ) ) ->
+                let progress = move gameTime progress
+
+                returnModel 
+                    { model with 
+                        moving = 
+                            Some 
+                              ( o 
+                              , c 
+                              , p 
+                              , i 
+                              , Some ( Staged ( target, origin, dest, progress ) ) 
+                              )
+                    }
 
             | _ -> returnModel model
 
@@ -285,22 +311,22 @@ let rec processMessage msg model gameTime =
                 let tableauSound = (fun n -> List.take n >> List.last >> snd >> getFaceContent >> Some)
                 
                 let cardsInPile, pickCards, moving =
-                    match model.moving,origin,count with
+                    match ( model.moving , origin , count ) with
                     | None , MoveOrigin.Talon , 1 ->
                         let pickCards = (fun model cards -> { model with talon = cards })
-                        model.talon, pickCards, Some (origin,(List.take 1 model.talon),pos, id) 
+                        model.talon, pickCards, Some ( origin , List.take 1 model.talon , pos , id , None ) 
 
                     | None , MoveOrigin.Foundation foundation , 1 ->
                         let cardsInFoundation = getFoundation foundation model |> cardsInFoundation
                         let pickCards = flip (setFoundation foundation)
-                        cardsInFoundation, pickCards, Some (origin,(List.take 1 cardsInFoundation),pos, id) 
+                        cardsInFoundation, pickCards, Some ( origin , List.take 1 cardsInFoundation , pos , id , None ) 
 
                     | None, MoveOrigin.Tableau tableau, n when n <= (getTableau tableau model |> faceUp |> List.length) && n > 0 ->
                         let cardsInTableau = getTableau tableau model |> faceUp
                         let pickCards = setTableauFaceUp tableau
-                        cardsInTableau, pickCards, Some (origin,(List.take n cardsInTableau),pos, id) 
+                        cardsInTableau, pickCards, Some ( origin , List.take n cardsInTableau , pos , id , None ) 
 
-                    | _ -> [], idFunc2, None
+                    | _ -> ( [] , idFunc2 , None )
 
                 returnModel { pickCards model (List.skip count cardsInPile) with moving = moving }
 
@@ -310,9 +336,9 @@ let rec processMessage msg model gameTime =
 
         | Move (tid, Delta (x,y)) ->
             match model.moving with
-            | Some (origin,cards,Point (oldX, oldY),id) when id = tid ->
+            | Some ( origin , cards , Point ( oldX , oldY ) , id , staging ) when id = tid ->
                 { model with
-                    moving = Some (origin,cards,Point (oldX + x, oldY + y),id)
+                    moving = Some ( origin , cards , Point ( oldX + x , oldY + y ) , id , staging )
                     }
                     ,[]
 
@@ -323,51 +349,46 @@ let rec processMessage msg model gameTime =
 
             let returnCardsToOrigin =
                 match model.moving with
-                | Some ( MoveOrigin.Talon , cards , _ , id ) when id = tid -> 
+                | Some ( MoveOrigin.Talon , cards , _ , id , _ ) when id = tid -> 
                     (@) cards |> modifyTalon
 
-                | Some ( MoveOrigin.Foundation foundation , cards , _ , id ) when id = tid -> 
+                | Some ( MoveOrigin.Foundation foundation , cards , _ , id , _ ) when id = tid -> 
                     (@) cards |> modifyFoundation foundation 
 
-                | Some ( MoveOrigin.Tableau tableau , cards , _ , id ) when id = tid -> 
+                | Some ( MoveOrigin.Tableau tableau , cards , _ , id , _ ) when id = tid -> 
                     (@) cards |> modifyTableauFaceUp tableau 
 
                 | _ -> idFunc
 
-            returnModel
-                { returnCardsToOrigin model with 
-                    moving = None
-                    pendingMove = None
-                    unstaging = None }
+            returnModel { returnCardsToOrigin model with moving = None }
 
 
         | StageMove ( face, target, point ) ->
-            match model.moving, model.pendingMove, model.unstaging with
-            | Some ( _ , cards , movingPos , _ ) , None, None -> 
+            match model.moving with
+            | Some ( origin , cards , movingPos , id , None ) -> 
                 let movingFace = List.last cards |> Model.face
-                { model with pendingMove = MoveModel ( target, movingPos, point, 0.0 ) |> Some }
-                , [
-                  PlaySound ( getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 )
-                  Delay ( 0.33, PlaySound ( getFaceContent movingFace, (if movingFace = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 ) |> Cmd |> wrapOperation processMessage )
-                  ] |> List.map Cmd
+
+                ( { model with moving = Some ( origin , cards , movingPos , id , Some ( Staged ( target, movingPos, point, 0.0 ) ) ) }
+                , [ PlaySound ( getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 )
+                    Delay ( 0.33, PlaySound ( getFaceContent movingFace, (if movingFace = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 ) |> Cmd |> wrapOperation processMessage )
+                  ] 
+                  |> List.map Cmd
+                )
 
             | _ -> returnModel model
 
 
         | UnstageMove target ->
-            match model.unstaging, model.pendingMove with
-            | None, Some ( MoveModel (  moveTarget, origin, dest, progress ) ) when target = moveTarget -> 
-                returnModel 
-                    { model with 
-                        pendingMove = None
-                        unstaging = Some ( UnstagingModel ( lerp origin dest progress, 0.0 ) ) }
+            match model.moving with
+            | Some ( o , c , p , i , Some ( Staged (  moveTarget, origin, dest, progress ) ) ) when target = moveTarget -> 
+                returnModel { model with moving = Some ( o , c , p , i , Some ( Unstaging ( lerp origin dest progress, 0.0 ) ) ) }
 
             | _ -> returnModel model
 
 
         | CommitMove tid ->
-            match model.moving, model.pendingMove with
-            | Some (_,cards,_,id), Some ( MoveModel ( target, _, _, _ ) ) when tid = id ->
+            match model.moving with
+            | Some ( _ , cards , _ , id , Some ( Staged ( target, _, _, _ ) ) ) when tid = id ->
 
                 match cards,target with
 
@@ -384,17 +405,13 @@ let rec processMessage msg model gameTime =
 
                 | _ -> model,[Msg (CancelMove id)]
             
-            | Some (_,_,_,id), None -> model,[Msg (CancelMove id)]
+            | Some ( _ , _ , _ , id , None ) -> model,[Msg (CancelMove id)]
 
             | _ -> returnModel model
 
 
         | MoveCommitted ->
-            let model = 
-                { model with 
-                    moving = None
-                    pendingMove = None
-                    unstaging = None }
+            let model = { model with  moving = None }
 
             if suits |> List.map ((flip getFoundation) model) |> List.map cardsInFoundation |> List.map List.length = [12;12;12;12]
             then

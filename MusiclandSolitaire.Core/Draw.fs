@@ -293,13 +293,14 @@ let tableaus model =
 let moving model =
     match model.moving with
     | None -> []
-    | Some (_,cards,movingPosition,_) ->
+    | Some ( _ , cards , movingPosition , _ , staging ) ->
         let bottom = List.head cards
         let position =
-            match model.pendingMove, model.unstaging with
-            | _, Some ( UnstagingModel ( origin, progress ) ) -> lerp origin movingPosition progress
-            | Some ( MoveModel ( _, origin, dest, progress ) ), _ -> lerp origin dest progress
-            | _ -> movingPosition
+            match staging with
+            | Some ( Unstaging ( origin, progress ) ) -> lerp origin movingPosition progress
+            | Some ( Staged ( _, origin, dest, progress ) ) -> lerp origin dest progress
+            | None -> movingPosition
+
         Area 
           ( "CardBack"
           , movingPosition

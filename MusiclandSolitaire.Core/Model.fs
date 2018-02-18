@@ -60,13 +60,12 @@ type Tableau = Tableau of Card list * Card list
 type Foundation = Foundation of Card list * Suit
 
 
-type MovingModel = MoveOrigin * Card list * Point * int
+type Staging =
+    | Staged of MoveTarget * Point * Point * float
+    | Unstaging of Point * float
 
 
-type MoveModel = MoveModel of MoveTarget * Point * Point * float
-
-
-type UnstagingModel = UnstagingModel of Point * float
+type MovingModel = MoveOrigin * Card list * Point * int * Staging option
 
 
 type Model = {
@@ -85,8 +84,6 @@ type Model = {
     diamondsFoundation : Foundation
     clubsFoundation : Foundation
     moving : MovingModel option
-    pendingMove : MoveModel option
-    unstaging : UnstagingModel option
     rng : System.Random
     popReady : bool
     pendingGestures : PendingGesture list
