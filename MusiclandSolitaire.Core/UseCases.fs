@@ -79,10 +79,10 @@ let initialize rng =
 // --------- Advance Time For Animations ---------
 //
 
-let advanceTime model gameTime =
+let advanceTime model gameTime wrapOperation =
     let move gameTime progress = 
         let speed = (10.0 - 30.0) * progress + 30.0
-        let step = ((float gameTime.elapsed.Milliseconds) * 0.001) * speed
+        let step = ((float gameTime.elapsed.TotalMilliseconds) * 0.001) * speed
         min 1.0 (progress + step)
 
     match model.hand with
@@ -94,14 +94,28 @@ let advanceTime model gameTime =
               else 
                   Some ( Unstaging ( origin, progress ) )
 
-        { model with hand = Some ( o , c , p , i , staging ) }
+        returnModel { model with hand = Some ( o , c , p , i , staging ) }
 
-    | Some ( o , c , p , i , Some ( Staged ( target, origin, dest, progress ) ) ) ->
+    | Some ( o , cards , p , i , Some ( Staged ( target , origin , dest , progress , timeStaged , playedSound ) ) ) ->
         let progress = move gameTime progress
 
-        { model with hand = Some ( o , c , p , i , Some ( Staged ( target, origin, dest, progress ) ) ) }
+        let playSound = playedSound = false && gameTime.total.TotalMilliseconds - timeStaged.total.TotalMilliseconds >= 500.0
+        let newHand = Some ( o , cards , p , i , Some ( Staged ( target, origin, dest, progress , timeStaged , playSound || playedSound ) ) )
 
-    | _ -> model
+        let targetFace = getTopCard target model |> mapOption face
+        let movingFace = List.last cards |> face
+
+        ( { model with hand = newHand }
+        , match ( playSound , targetFace ) with
+          | ( true , Some f ) ->
+            [
+                Cmd ( PlaySound ( getFaceContent f , (if f = KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) , 1.0 ) )
+                Cmd ( Delay ( 0.33, Cmd ( PlaySound ( getFaceContent movingFace , (if movingFace = KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) , 1.0 ) )  |> wrapOperation ) )
+            ]
+          | _ -> []
+        )
+
+    | _ -> returnModel model
 
 
 
@@ -201,19 +215,14 @@ let cancelMove model =
 // --------- Stage a Move ---------
 //
 
-let stageMove face target point wrapOperation model =
+let stageMove face target point gameTime model =
     match model.hand with
     | Some ( origin , cards , movingPos , id , None ) -> 
         let movingFace = List.last cards |> Model.face
 
-        ( { model with hand = Some ( origin , cards , movingPos , id , Some ( Staged ( target, movingPos, point, 0.0 ) ) ) }
-        , [ PlaySound ( getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 )
-            Delay ( 0.33, PlaySound ( getFaceContent movingFace, (if movingFace = KeySignature then NoOverlap else SoundMode.Overlap), 1.0 ) |> Cmd |> wrapOperation )
-          ] 
-          |> List.map Cmd
-        )
+        { model with hand = Some ( origin , cards , movingPos , id , Some ( Staged ( target, movingPos, point, 0.0 , gameTime , false ) ) ) }
 
-    | _ -> returnModel model
+    | _ -> model
 
 
 
@@ -223,7 +232,7 @@ let stageMove face target point wrapOperation model =
 
 let unstageMove target model =
     match model.hand with
-    | Some ( o , c , p , i , Some ( Staged (  moveTarget, origin, dest, progress ) ) ) when target = moveTarget -> 
+    | Some ( o , c , p , i , Some ( Staged (  moveTarget, origin, dest, progress , _, _ ) ) ) when target = moveTarget -> 
         { model with hand = Some ( o , c , p , i , Some ( Unstaging ( lerp origin dest progress, 0.0 ) ) ) }
 
     | _ -> model
@@ -236,7 +245,7 @@ let unstageMove target model =
 
 let commitMove touchId model =
     match model.hand with
-    | Some ( _ , cards , _ , id , Some ( Staged ( target, _, _, _ ) ) ) when touchId = id ->
+    | Some ( _ , cards , _ , id , Some ( Staged ( target, _, _, _ , _ , _ ) ) ) when touchId = id ->
 
         match ( cards , target ) with
 

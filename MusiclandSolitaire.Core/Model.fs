@@ -61,7 +61,7 @@ type Foundation = Foundation of Card list * Suit
 
 
 type Staging =
-    | Staged of MoveTarget * Point * Point * float
+    | Staged of MoveTarget * Point * Point * float * GameTime * bool
     | Unstaging of Point * float
 
 
@@ -262,6 +262,13 @@ let updateTableau faceUp card (Tableau (up,down)) = Tableau (if faceUp then card
 
 
 let pushCardToTableau tableau faceUp card = updateTableau faceUp card |> modifyTableau tableau
+
+
+let getTopCard target model =
+    match target with
+    | MoveTarget.Foundation f -> getFoundation f model |> cardsInFoundation
+    | MoveTarget.Tableau t -> getTableau t model |> faceUp
+    |> List.tryHead
 
 
 let setTableauFaceUp tableau model newFaceUp =

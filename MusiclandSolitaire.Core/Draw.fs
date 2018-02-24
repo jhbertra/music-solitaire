@@ -315,7 +315,7 @@ let moving model =
         let position =
             match staging with
             | Some ( Unstaging ( origin, progress ) ) -> lerp origin movingPosition progress
-            | Some ( Staged ( _, origin, dest, progress ) ) -> lerp origin dest progress
+            | Some ( Staged ( _, origin, dest, progress , _ , _ ) ) -> lerp origin dest progress
             | None -> movingPosition
 
         Area 

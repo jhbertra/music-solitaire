@@ -99,7 +99,7 @@
     <Folder Include="Content\" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MusicSolitaireGame.fs" />
+    <Compile Include="FsGame.iOS.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
     <Content Include="Content\sfx\Do_Sus.xnb" />

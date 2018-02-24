@@ -8,8 +8,6 @@ open Microsoft.Xna.Framework.Input.Touch
 
 open Core
 
-type Event<'m, 't> = TimerEnd of Update<'m, 't>
-
 let vector2ToFloatTuple (vec : Microsoft.Xna.Framework.Vector2) = ((float)vec.X,(float)vec.Y)
     
 let scale = 750.0 / float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width // temporary hard-coded scaling
@@ -23,17 +21,20 @@ let getTouches (touchCol: TouchCollection) =
 type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
     inherit Microsoft.Xna.Framework.Game()
 
+
     let _ = new Microsoft.Xna.Framework.GraphicsDeviceManager(this)
-    let events = System.Collections.Concurrent.ConcurrentQueue<Event<'m, 't>>()
+
 
     [<DefaultValue>] val mutable model : 'm
+    [<DefaultValue>] val mutable delayed : ( System.TimeSpan * float * Update<'m, 't> ) list
     [<DefaultValue>] val mutable objects : GameObject<'t> list
     [<DefaultValue>] val mutable textures : Map<string, Texture2D>
     [<DefaultValue>] val mutable sfxInstances : Map<string, SoundEffectInstance>
     [<DefaultValue>] val mutable sfx : Map<string, SoundEffect>
     [<DefaultValue>] val mutable spriteBatch : SpriteBatch
 
-    let rec runCommands = function
+
+    let rec runCommands totalTime = function
         | [] -> ()
         | PlaySound (sound, mode, volume)::xs ->
             optional {
@@ -50,14 +51,13 @@ type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
                             instance.Play() |> ignore
                     | NoOverlap -> () |> ignore
             } |> ignore
-            runCommands xs
-        | Delay (time, update)::xs ->
-            let timer = new System.Timers.Timer(1000.0 * time)
-            timer.AutoReset <- false
-            timer.Enabled <- true
-            timer.Elapsed.Add(fun _ -> events.Enqueue(TimerEnd update) |> ignore)
-            timer.Start()
-            runCommands xs
+            runCommands totalTime xs
+        | Delay ( delay , update ) :: xs ->
+            this.delayed <- List.rev ( ( totalTime , delay , update ) :: List.rev this.delayed )
+            printfn "%A" this.delayed
+            runCommands totalTime xs
+
+
 
     //
     // --------- Initialize ---------
@@ -66,8 +66,11 @@ type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
     override this.Initialize() = 
         this.spriteBatch <- new SpriteBatch(this.GraphicsDevice)
         this.model <- engine.init
+        this.delayed <- []
         TouchPanel.EnabledGestures <- GestureType.Tap ||| GestureType.FreeDrag ||| GestureType.DragComplete
         base.Initialize()
+
+
 
     //
     // --------- Load ---------
@@ -75,12 +78,14 @@ type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
 
     let findTexture t = Map.find t this.textures
 
+
     let rec makeBox (findTexture : string -> Texture2D) (Point (x,y)) = function
         | [] -> BoundingBox (x, y, 0.0, 0.0)
         | t::ts ->
             let texture = findTexture t
             let tBox = BoundingBox (x, y, float texture.Width, float texture.Height)
             makeBox findTexture (Point (x,y)) ts |> union tBox
+
 
     let toGameObject findTexture = function
         | Area (texture, point, tag) -> { textures = []; box = makeBox findTexture point [texture]; alpha = 1.0; tag = tag }
@@ -103,27 +108,26 @@ type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
         this.objects <- engine.draw this.model |> List.map (toGameObject findTexture)
         base.LoadContent()
 
+
+
     //
     // --------- Update ---------
     //
 
     let gameSpace = (*) scale
-    
-    let processEvent (TimerEnd callback) = callback
 
-    let rec processEvents (events : System.Collections.Concurrent.ConcurrentQueue<Event<'m, 't>>) gameState =
-        State.builder {
-            match events.TryDequeue() with
-            | false,_ -> return gameState
-            | true,event ->
-                let! commands = State.get
-                let (UpdateResult (model,newCommands)) = processEvent event gameState
-                do! State.put (commands @ newCommands)
-                return! processEvents events { gameState with model = model } 
-        }
+
+    let rec runDelayed gameState = function
+    | [] -> State.fromValue gameState.model
+    | update :: updates ->
+            let (UpdateResult (model,newCommands)) = update gameState
+            State.modify (newCommands |> flip (@))
+            |> State.bind ( fun () -> runDelayed { gameState with model = model } updates )
+
 
     override this.Update(gameTime) =
         let touches = getTouches (TouchPanel.GetState())
+
         let gameState = { 
             touches = touches
             gameTime = 
@@ -135,18 +139,30 @@ type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
             objects = this.objects
             model = this.model 
             }
+
+        let elapsedDelays = 
+            this.delayed
+            |> List.takeWhile ( fun ( start : System.TimeSpan , wait , _ ) ->
+                (gameTime.TotalGameTime.TotalMilliseconds - start.TotalMilliseconds) * 0.001 >= wait )
+            |> List.map ( fun ( _ , _ , update ) -> update )
+
         let model,commands = 
             State.builder {
-                let! gameState = lock events (fun () -> processEvents events gameState)
-                let! commands = State.get
-                let (UpdateResult (model,newCommands)) = engine.update gameState
-                do! State.put (commands @ newCommands)
+                let! model = runDelayed gameState elapsedDelays
+                let ( UpdateResult ( model , newCommands ) ) = engine.update gameState
+                do! State.modify (newCommands |> flip (@))
                 return model
             }
             |> State.run []
+
+        
+        this.delayed <- List.skip ( List.length elapsedDelays ) this.delayed
+
         this.model <- model
-        runCommands commands                
+        runCommands gameTime.TotalGameTime commands                
         base.Update(gameTime)
+
+
 
     //
     // --------- Draw ---------

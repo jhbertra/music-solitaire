@@ -14,7 +14,7 @@ let processMessage msg model gameTime wrapOperation =
     else
         match msg with
 
-        | Step -> UseCases.advanceTime model gameTime |> returnModel
+        | Step -> UseCases.advanceTime model gameTime wrapOperation
 
         | Reset -> UseCases.initialize model.rng |> returnModel
 
@@ -28,7 +28,7 @@ let processMessage msg model gameTime wrapOperation =
 
         | CancelMove -> UseCases.cancelMove model |> returnModel
 
-        | StageMove ( face, target, point ) -> UseCases.stageMove face target point wrapOperation model
+        | StageMove ( face, target, point ) -> UseCases.stageMove face target point gameTime model |> returnModel
 
         | UnstageMove target -> UseCases.unstageMove target model |> returnModel
 
@@ -129,8 +129,6 @@ and wrapOperation = function
 
 
 let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
-
-    printfn "%f" (1.0 / ((float gameState.gameTime.elapsed.Milliseconds) * 0.001))
 
     let gestureResults =
         touchEvents gameState.model.previousTouches gameState.touches gameState.gameTime
