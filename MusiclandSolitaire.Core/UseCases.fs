@@ -215,7 +215,7 @@ let cancelMove model =
 // --------- Stage a Move ---------
 //
 
-let stageMove face target point gameTime model =
+let stageMove target point gameTime model =
     match model.hand with
     | Some ( origin , cards , movingPos , id , None ) -> 
         let movingFace = List.last cards |> Model.face

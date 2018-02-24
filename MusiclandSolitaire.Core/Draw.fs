@@ -196,7 +196,12 @@ let stock model =
     |> drawPile model.stock
 
 
-let faceUpPile cards origin position =
+let faceUpPile hand cards origin position =
+    let dragHandler =
+        match hand with
+        | Some _ -> None
+        | None -> ( Some ( fun id _ _ -> BeginMove ( origin , 1 , position , id ) ) )
+
     drawPile
         cards
         (fun card ->
@@ -206,13 +211,14 @@ let faceUpPile cards origin position =
                 ( handler ( CardTapped card ) )
                 None
                 None
-                ( Some ( fun id _ _ -> BeginMove ( origin , 1 , position , id ) ) )
+                dragHandler
                 card
         )
 
 
 let talon model =
     faceUpPile
+        model.hand
         model.talon
         Talon
         ( Point talonPosition )
@@ -222,16 +228,31 @@ let foundations model =
     List.zip 
         [ Hearts; Spades; Diamonds; Clubs ]
         [ heartsFoundationPosition; spadesFoundationPosition; diamondsFoundationPosition; clubsFoundationPosition ]
-    |> List.collect ( fun ( suit , position ) -> faceUpPile ( getFoundation suit model |> cardsInFoundation ) ( MoveOrigin.Foundation suit ) ( Point position ) )
+    |> List.collect (
+        fun ( suit , position ) ->
+            let position = Point position
+            let cards = getFoundation suit model |> cardsInFoundation
+            Area 
+              ( "CardBack"
+              , position
+              , { 
+                id = TagId.Target ( MoveTarget.Foundation suit )
+                position = position
+                tapHandler = None
+                touchDownHandler = None
+                touchUpHandler = None
+                dragHandler = None
+                stopTouchPropagation = false
+                overlapHandler = None
+                } 
+              )
+            :: faceUpPile model.hand cards ( MoveOrigin.Foundation suit ) ( position ) )
 
 
 let rec drawFannedPile pile position sprite topArea =
     match ( pile , position ) with
-    | ( [] , _ ) -> []
-
-    | ( [ card ] , Point ( x , y ) ) -> 
-        sprite ( Point ( x , y ) ) [ card ] card
-        :: topArea ( Point ( x , y + cardSpacing ) ) card
+    | ( [] , pos ) -> 
+        topArea pos
 
     | ( card :: tail , Point ( x , y ) ) -> 
         sprite ( Point ( x , y ) ) ( card :: tail ) card
@@ -245,7 +266,7 @@ let tableau tableau ( x , y ) model =
         down
         ( Point ( x , y ) )
         ( fun pos _ -> drawCard pos false None None None None )
-        ( fun _ _ -> [] )
+        ( fun _ -> [] )
     @ drawFannedPile
         (List.rev up)
         ( Point ( x ,  y + cardSpacing * (List.length down |> float) ) )
@@ -267,12 +288,12 @@ let tableau tableau ( x , y ) model =
                 )
                 card
         )
-        (fun pos card -> 
+        (fun pos -> 
             [Area 
               ( "CardBack"
               , pos
-              , { 
-                id = TagId.Target ( card , MoveTarget.Tableau tableau )
+              , {
+                id = TagId.Target ( MoveTarget.Tableau tableau )
                 position = pos
                 tapHandler = None
                 touchDownHandler = None
@@ -298,10 +319,10 @@ let tableaus model =
 
 
 let movingOverlap movingFace = function
-| Overlap ({id = TagId.Target (Card (_,face), target); position = point },box) when area box > 4000.0 ->
-    StageMove ( face, target, point ) |> Some
+| Overlap ( { id = TagId.Target target; position = point } , box ) when area box > 4000.0 ->
+    StageMove ( target, point ) |> Some
 
-| Overlap ({id = TagId.Target (_, target) },box) ->
+| Overlap ( { id = TagId.Target target } , box ) ->
     UnstageMove target |> Some
 
 | _ -> None
@@ -318,7 +339,22 @@ let moving model =
             | Some ( Staged ( _, origin, dest, progress , _ , _ ) ) -> lerp origin dest progress
             | None -> movingPosition
 
-        Area 
+        Sprite
+          ( cardBack
+          , movingPosition
+          , 0.5
+          , {
+            id = TagId.Nothing
+            position = position
+            tapHandler = None
+            touchDownHandler = None
+            touchUpHandler = None
+            dragHandler = None
+            stopTouchPropagation = true
+            overlapHandler = None
+            }
+          )
+        :: Area 
           ( "CardBack"
           , movingPosition
           , { 
@@ -336,7 +372,7 @@ let moving model =
             ( List.rev cards )
             position
             ( fun pos _ -> drawCard pos true None None None None )
-            ( fun _ _ -> [] )
+            ( fun _ -> [] )
 
 
 let draw model =

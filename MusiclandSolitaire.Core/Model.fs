@@ -108,7 +108,7 @@ type TagId =
     | FlipTalon
     | Reset
     | MovingBottom of Card
-    | Target of Card * MoveTarget
+    | Target of MoveTarget
 
 type Msg =
     | Step
@@ -117,7 +117,7 @@ type Msg =
     | BeginMove of MoveOrigin * int * Point * int
     | Move of int * Delta
     | CancelMove
-    | StageMove of Face * MoveTarget * Point
+    | StageMove of MoveTarget * Point
     | UnstageMove of MoveTarget
     | CommitMove of int
     | MoveCommitted

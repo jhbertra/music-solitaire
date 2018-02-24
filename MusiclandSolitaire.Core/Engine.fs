@@ -28,7 +28,7 @@ let processMessage msg model gameTime wrapOperation =
 
         | CancelMove -> UseCases.cancelMove model |> returnModel
 
-        | StageMove ( face, target, point ) -> UseCases.stageMove face target point gameTime model |> returnModel
+        | StageMove ( target, point ) -> UseCases.stageMove target point gameTime model |> returnModel
 
         | UnstageMove target -> UseCases.unstageMove target model |> returnModel
 
