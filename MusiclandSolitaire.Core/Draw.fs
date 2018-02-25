@@ -336,22 +336,7 @@ let moving model =
             | Some ( Staged ( _, origin, dest, progress , _ , _ ) ) -> lerp origin dest progress
             | None -> movingPosition
 
-        Sprite
-          ( cardBack
-          , movingPosition
-          , 0.5
-          , {
-            id = TagId.Nothing
-            position = position
-            tapHandler = None
-            touchDownHandler = None
-            touchUpHandler = None
-            dragHandler = None
-            stopTouchPropagation = true
-            overlapHandler = None
-            }
-          )
-        :: Area 
+        Area 
           ( "CardBack"
           , movingPosition
           , { 
