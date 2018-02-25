@@ -322,9 +322,6 @@ let movingOverlap movingFace = function
 | Overlap ( { id = TagId.Target target; position = point } , box ) when area box > 4000.0 ->
     StageMove ( target, point ) |> Some
 
-| Overlap ( { id = TagId.Target target } , box ) ->
-    UnstageMove target |> Some
-
 | _ -> None
 
 

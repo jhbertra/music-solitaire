@@ -12,11 +12,15 @@ let vector2ToFloatTuple (vec : Microsoft.Xna.Framework.Vector2) = ((float)vec.X,
     
 let scale = 750.0 / float GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width // temporary hard-coded scaling
 
+let gameSpace = (*) scale
+
+let screenSpace x = x / scale
+
 let getTouches (touchCol: TouchCollection) =
     touchCol
     |> List.ofSeq
     |> List.map (fun touch -> 
-        Touch (touch.Id,touch.Position |> vector2ToFloatTuple |> mapT2 ((flip (/)) scale) |> Point ))
+        Touch (touch.Id,touch.Position |> vector2ToFloatTuple |> mapT2 gameSpace |> Point ))
 
 type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
     inherit Microsoft.Xna.Framework.Game()
@@ -54,7 +58,6 @@ type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
             runCommands totalTime xs
         | Delay ( delay , update ) :: xs ->
             this.delayed <- List.rev ( ( totalTime , delay , update ) :: List.rev this.delayed )
-            printfn "%A" this.delayed
             runCommands totalTime xs
 
 
@@ -114,8 +117,6 @@ type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
     // --------- Update ---------
     //
 
-    let gameSpace = (*) scale
-
 
     let rec runDelayed gameState = function
     | [] -> State.fromValue gameState.model
@@ -174,7 +175,7 @@ type FsGame<'m, 't>(engine : GameEngine<'m, 't>) as this =
         for object in this.objects do
             for texture in object.textures do
                 let texture2D = findTexture texture
-                let x,y,w,h = bounds object |> mapT4 gameSpace |> mapT4 int
+                let x,y,w,h = bounds object |> mapT4 screenSpace |> mapT4 int
                 this.spriteBatch.Draw(texture2D, Microsoft.Xna.Framework.Rectangle(x, y, w, h), Microsoft.Xna.Framework.Color.White * float32 object.alpha)
         this.spriteBatch.End()
         base.Draw(gameTime)

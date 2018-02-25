@@ -118,7 +118,7 @@ type Msg =
     | Move of int * Delta
     | CancelMove
     | StageMove of MoveTarget * Point
-    | UnstageMove of MoveTarget
+    | UnstageMove
     | CommitMove of int
     | MoveCommitted
     | Reset

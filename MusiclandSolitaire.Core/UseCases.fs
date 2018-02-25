@@ -96,11 +96,28 @@ let advanceTime model gameTime wrapOperation =
 
         returnModel { model with hand = Some ( o , c , p , i , staging ) }
 
-    | Some ( o , cards , p , i , Some ( Staged ( target , origin , dest , progress , timeStaged , playedSound ) ) ) ->
+    | Some ( o , cards , handPos , i , Some ( Staged ( target , origin , dest , progress , timeStaged , playedSound ) ) )
+        when distance handPos dest |> abs <= 56.0 ->
         let progress = move gameTime progress
 
         let playSound = playedSound = false && gameTime.total.TotalMilliseconds - timeStaged.total.TotalMilliseconds >= 500.0
-        let newHand = Some ( o , cards , p , i , Some ( Staged ( target, origin, dest, progress , timeStaged , playSound || playedSound ) ) )
+        let newHand = 
+            Some 
+              ( o 
+              , cards 
+              , handPos 
+              , i 
+              , Some 
+                ( Staged 
+                    ( target 
+                    , origin 
+                    , dest 
+                    , progress 
+                    , timeStaged 
+                    , playSound || playedSound 
+                    ) 
+                ) 
+              )
 
         let targetFace = getTopCard target model |> mapOption face
         let movingFace = List.last cards |> face
@@ -114,6 +131,11 @@ let advanceTime model gameTime wrapOperation =
             ]
           | _ -> []
         )
+
+    | Some ( o , cards , handPos , i , Some ( Staged ( target , origin , dest , progress , timeStaged , playedSound ) ) ) ->
+        ( model
+        , [ Msg UnstageMove ]
+        )    
 
     | _ -> returnModel model
 
@@ -230,9 +252,9 @@ let stageMove target point gameTime model =
 // --------- Unstage a Move ---------
 //
 
-let unstageMove target model =
+let unstageMove model =
     match model.hand with
-    | Some ( o , c , p , i , Some ( Staged (  moveTarget, origin, dest, progress , _, _ ) ) ) when target = moveTarget -> 
+    | Some ( o , c , p , i , Some ( Staged (  moveTarget, origin, dest, progress , _, _ ) ) ) -> 
         { model with hand = Some ( o , c , p , i , Some ( Unstaging ( lerp origin dest progress, 0.0 ) ) ) }
 
     | _ -> model

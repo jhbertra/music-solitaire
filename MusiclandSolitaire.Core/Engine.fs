@@ -30,7 +30,7 @@ let processMessage msg model gameTime wrapOperation =
 
         | StageMove ( target, point ) -> UseCases.stageMove target point gameTime model |> returnModel
 
-        | UnstageMove target -> UseCases.unstageMove target model |> returnModel
+        | UnstageMove -> UseCases.unstageMove model |> returnModel
 
         | CommitMove id -> UseCases.commitMove id model
 
