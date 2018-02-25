@@ -14,7 +14,7 @@ let processMessage msg model gameTime wrapOperation =
     else
         match msg with
 
-        | Step -> UseCases.advanceTime model gameTime wrapOperation
+        | Step -> UseCases.step gameTime wrapOperation model
 
         | Reset -> UseCases.initialize model.rng |> returnModel
 
@@ -42,6 +42,8 @@ let processMessage msg model gameTime wrapOperation =
             )
 
         | FlipTalon -> UseCases.recycleTalon model |> returnModel
+
+        | PlayMoveSound nextMsgs -> UseCases.playMoveSound wrapOperation (nextMsgs |> List.map Msg) model
 
 
 let rec messagesFromGesture objects (id,gestureType) =

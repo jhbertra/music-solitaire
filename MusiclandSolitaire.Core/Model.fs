@@ -124,6 +124,7 @@ type Msg =
     | Reset
     | CardTapped of Card
     | FlipTalon
+    | PlayMoveSound of Msg list
 
 type Tag = {
     id : TagId

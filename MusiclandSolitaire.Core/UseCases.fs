@@ -76,10 +76,10 @@ let initialize rng =
 
 
 //
-// --------- Advance Time For Animations ---------
+// --------- Logic to Evaluate Every Frame ---------
 //
 
-let advanceTime model gameTime wrapOperation =
+let step gameTime wrapOperation model =
     let move gameTime progress = 
         let speed = (10.0 - 30.0) * progress + 30.0
         let step = ((float gameTime.elapsed.TotalMilliseconds) * 0.001) * speed
@@ -100,7 +100,48 @@ let advanceTime model gameTime wrapOperation =
         when distance handPos dest |> abs <= 56.0 ->
         let progress = move gameTime progress
 
-        let playSound = playedSound = false && gameTime.total.TotalMilliseconds - timeStaged.total.TotalMilliseconds >= 500.0
+        let model = 
+            { model with
+                hand =
+                    Some 
+                      ( o 
+                      , cards 
+                      , handPos 
+                      , i 
+                      , Some 
+                        ( Staged 
+                            ( target 
+                            , origin 
+                            , dest 
+                            , progress 
+                            , timeStaged 
+                            , playedSound 
+                            ) 
+                        ) 
+                      ) 
+              }
+        
+        if playedSound = false && gameTime.total.TotalMilliseconds - timeStaged.total.TotalMilliseconds >= 500.0 then
+            ( model, [ Msg ( PlayMoveSound [] ) ] )
+        else
+            returnModel model
+
+    | Some ( o , cards , handPos , i , Some ( Staged ( target , origin , dest , progress , timeStaged , playedSound ) ) ) ->
+        ( model
+        , [ Msg UnstageMove ]
+        )    
+
+    | _ -> returnModel model
+
+
+
+//
+// --------- Play Move Sound ---------
+//
+
+let playMoveSound wrapOperation nextMsgs model =
+    match model.hand with
+    | Some ( o , cards , handPos , i , Some ( Staged ( target , origin , dest , progress , timeStaged , false ) ) ) ->
         let newHand = 
             Some 
               ( o 
@@ -114,7 +155,7 @@ let advanceTime model gameTime wrapOperation =
                     , dest 
                     , progress 
                     , timeStaged 
-                    , playSound || playedSound 
+                    , true 
                     ) 
                 ) 
               )
@@ -123,22 +164,16 @@ let advanceTime model gameTime wrapOperation =
         let movingFace = List.last cards |> face
 
         ( { model with hand = newHand }
-        , match ( playSound , targetFace ) with
-          | ( true , Some f ) ->
-            [
-                Cmd ( PlaySound ( getFaceContent f , (if f = KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) , 1.0 ) )
-                Cmd ( Delay ( 0.33, Cmd ( PlaySound ( getFaceContent movingFace , (if movingFace = KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) , 1.0 ) )  |> wrapOperation ) )
-            ]
-          | _ -> []
+        , nextMsgs
+          @ match ( targetFace ) with
+             | ( Some f ) ->
+               [
+                   Cmd ( PlaySound ( getFaceContent f , (if f = KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) , 1.0 ) )
+                   Cmd ( Delay ( 0.33, Cmd ( PlaySound ( getFaceContent movingFace , (if movingFace = KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) , 1.0 ) )  |> wrapOperation ) )
+               ]
+             | _ -> []
         )
-
-    | Some ( o , cards , handPos , i , Some ( Staged ( target , origin , dest , progress , timeStaged , playedSound ) ) ) ->
-        ( model
-        , [ Msg UnstageMove ]
-        )    
-
-    | _ -> returnModel model
-
+    | _ -> ( model , nextMsgs )
 
 
 //
@@ -267,23 +302,23 @@ let unstageMove model =
 
 let commitMove touchId model =
     match model.hand with
-    | Some ( _ , cards , _ , id , Some ( Staged ( target, _, _, _ , _ , _ ) ) ) when touchId = id ->
+    | Some ( _ , cards , _ , id , Some ( Staged ( target, _, _, _ , _ , false ) ) ) when touchId = id ->
+        ( model , [ Msg ( PlayMoveSound [ CommitMove touchId ] ) ] )
+
+    | Some ( _ , cards , _ , id , Some ( Staged ( target, _, _, _ , _ , true ) ) ) when touchId = id ->
 
         match ( cards , target ) with
 
         | [card] , MoveTarget.Foundation foundation when canPlaceOnFoundation (getFoundation foundation model) card ->
             let face = face card
             ( pushCardToFoundation foundation card { model with hand = None }
-            , [ 
-                  Cmd (PlaySound ((getFaceContent face),(if face = KeySignature then NoOverlap else SoundMode.Overlap),1.0))
-                  Msg MoveCommitted
-              ]
+            , [ Msg MoveCommitted ]
             )
                 
         | cards , MoveTarget.Tableau tableau when canPlaceOnTableau (getTableau tableau model |> faceUp) cards ->
             ( modifyTableauFaceUp tableau ((@) cards) { model with hand = None } , [Msg MoveCommitted] )
 
-        | _ -> ( model , [Msg CancelMove] )
+        | _ -> ( model , [ Msg CancelMove ] )
     
     | Some ( _ , _ , _ , id , None ) -> ( model , [Msg CancelMove] )
 
