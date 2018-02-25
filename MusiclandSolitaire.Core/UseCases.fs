@@ -161,17 +161,44 @@ let playMoveSound wrapOperation nextMsgs model =
               )
 
         let targetFace = getTopCard target model |> mapOption face
-        let movingFace = List.last cards |> face
+
+        let targetSound =
+            match targetFace with
+            | None | Some KeySignature -> None
+            | Some face -> getFaceContent face |> Some
+
+        let movingSound = List.last cards |> face |> getFaceContent 
 
         ( { model with hand = newHand }
         , nextMsgs
-          @ match ( targetFace ) with
-             | ( Some f ) ->
-               [
-                   Cmd ( PlaySound ( getFaceContent f , (if f = KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) , 1.0 ) )
-                   Cmd ( Delay ( 0.33, Cmd ( PlaySound ( getFaceContent movingFace , (if movingFace = KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) , 1.0 ) )  |> wrapOperation ) )
-               ]
-             | _ -> []
+          @ match ( targetSound ) with
+             | ( Some sound ) ->
+                   [
+                   Cmd ( PlaySound ( sound , SoundMode.Overlap , 1.0 ) )
+                   Cmd 
+                     ( Delay 
+                         ( 0.33
+                         , Cmd 
+                             ( PlaySound 
+                                 ( movingSound 
+                                 , (if movingSound = getFaceContent KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) 
+                                 , 1.0 
+                                 ) 
+                             )  |> wrapOperation 
+                         ) 
+                     )
+                   ]
+
+             | None -> 
+                   [
+                   Cmd 
+                     ( PlaySound 
+                        ( movingSound 
+                        , (if movingSound = getFaceContent KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) 
+                        , 1.0 
+                        ) 
+                     )
+                   ]
         )
     | _ -> ( model , nextMsgs )
 
