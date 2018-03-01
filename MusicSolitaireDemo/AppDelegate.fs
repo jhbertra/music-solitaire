@@ -12,6 +12,7 @@ type AppDelegate () =
     inherit UIApplicationDelegate ()
 
     override __.FinishedLaunching (_, _) =
-        let game = new FsGame<Model, Tag>(engine(System.Random()))
+        let engine = engine(System.Random())
+        let game = new TouchGame<Model, Tag>(engine)
         game.Run()
         true

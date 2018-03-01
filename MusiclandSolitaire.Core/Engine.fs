@@ -1,12 +1,17 @@
 module Engine
 
-open Core
-open FsGame.Platform
-open Touch
+open FsEssentials
+
+open FsGame.Core
+open FsGame.Touch
+
 open Model
 open Draw
 
 let returnModel = UseCases.returnModel
+
+let (<*>) = Option.(<*>)
+let (<?>) = Option.(<?>)
 
 let processMessage msg model gameTime wrapOperation =
     if model.won && msg <> Reset then
@@ -57,12 +62,7 @@ let rec messagesFromGesture objects (id,gestureType) =
             | GestureType.TouchUp pos -> tag.touchUpHandler <?> id, pos
             | GestureType.Drag (startPos,delta) -> tag.dragHandler <?> id <?> delta, startPos
         
-        let result =
-            optional {
-                let! handler = handler
-                let! pointInBox = pointInBox hitPos box
-                return handler pointInBox
-            }
+        let result = handler <*> pointInBox hitPos box
 
         match result with
         | None -> messagesFromGesture os (id,gestureType)
@@ -75,8 +75,8 @@ let rec messagesFromGesture objects (id,gestureType) =
 let rec overlaps id box = function
 | { box = box2; tag = tag2 } :: os when id <> tag2.id ->
     (intersect box box2
-    |> mapOption (fun overlap -> Overlap (tag2,overlap))
-    |> optionToSingletonList)
+    |> Option.map (fun overlap -> Overlap (tag2,overlap))
+    |> Option.toSingletonList)
     @ overlaps id box os
 | _ -> []
 
@@ -85,7 +85,7 @@ let rec messagesFromObjects = function
 | { tag = { id = id; overlapHandler = Some handler }; box = box } :: os ->
     overlaps id box os
     |> List.map handler
-    |> values
+    |> Option.filterNone
     |> List.append (messagesFromObjects os)
 | _ :: os -> messagesFromObjects os
 
@@ -93,10 +93,10 @@ let messages objects gestures gameTime = Step :: (gestures |> List.collect (mess
 
 let setModel model (UpdateResult (_,cmds)) = UpdateResult (model,cmds)
 
-let addCommand command (UpdateResult (model,cmds)) = UpdateResult (model,command :: cmds)
+let addCommands commands (UpdateResult (model,cmds)) = UpdateResult (model,cmds @ commands)
 
 let getModel = 
-    State.builder { 
+    State.state { 
         let! UpdateResult (model,_) = State.get
         return model 
     }
@@ -115,12 +115,11 @@ let rec sendMessages gameTime = function
     | (Msg _) :: ops -> commands ops
     | (Cmd cmd) :: ops -> cmd :: commands ops
 
-    State.builder {
+    State.state {
         let! model = getModel
         let model,nextOperations = processMessage msg model gameTime wrapOperation
         do! State.modify (setModel model)
-        for cmd in commands nextOperations do
-            do! State.modify (addCommand cmd)
+        do! commands nextOperations |> addCommands |> State.modify
         return! sendMessages gameTime ((messages nextOperations) @ msgs)
     }
 
@@ -130,16 +129,16 @@ and wrapOperation = function
 | Cmd cmd -> fun {model=model} -> UpdateResult (model, [cmd])
 
 
-let update (gameState : GameState<Model, Tag>) : UpdateResult<Model, Tag> =
+let update (gameState : GameState<Model, Touch list, Tag>) : UpdateResult<Model, Touch list, Tag> =
 
     let gestureResults =
-        touchEvents gameState.model.previousTouches gameState.touches gameState.gameTime
+        touchEvents gameState.model.previousTouches gameState.controller gameState.gameTime
         |> processEvents gameState.model.pendingGestures
 
     let model = 
         { gameState.model with
             pendingGestures = pendingGestures gestureResults
-            previousTouches = gameState.touches
+            previousTouches = gameState.controller
             }
 
     messages (List.rev gameState.objects) (gestures gestureResults) gameState.gameTime 

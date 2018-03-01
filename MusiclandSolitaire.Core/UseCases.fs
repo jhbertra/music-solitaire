@@ -1,8 +1,11 @@
 ﻿module UseCases
 
-open Core
-open FsGame.Platform
-open Touch
+open FsEssentials
+open Prelude
+
+open FsGame.Core
+open FsGame.Touch
+
 open Model
 
 //
@@ -17,22 +20,22 @@ let returnModel model = ( model , [] )
 // --------- Init ---------
 //
 
-let rec deal cards =
-    State.builder {
-        for card in cards do
-            let! tableauDealMoves = State.gets getTableauDealMoves
-            let! model = State.gets getModel
+let rec deal dealState = function
+| [] -> getModel dealState
+| card :: cards ->
+    let tableauDealMoves = getTableauDealMoves dealState
+    let model = getModel dealState
 
-            match tableauDealMoves with
-            | [] ->
-                do! model |> pushCardToStock card |> setModel |> State.modify
+    let dealState = 
+        match tableauDealMoves with
+        | [] -> setModel (model |> pushCardToStock card ) dealState
 
-            | (tableau, faceUp) :: moves ->
-                do! setTableauDealMoves moves |> State.modify
-                do! model |> pushCardToTableau tableau faceUp card |> setModel |> State.modify
+        | (tableau, faceUp) :: moves ->
+           setTableauDealMoves moves dealState
+           |> setModel (model |> pushCardToTableau tableau faceUp card)
 
-        return! State.gets getModel
-    }
+    deal dealState cards
+
 
 let initialize rng = 
 
@@ -71,7 +74,7 @@ let initialize rng =
         model = model
         }
 
-    State.eval dealingState (deal deck)
+    deal dealingState deck
 
 
 
@@ -160,7 +163,7 @@ let playMoveSound wrapOperation nextMsgs model =
                 ) 
               )
 
-        let targetFace = getTopCard target model |> mapOption face
+        let targetFace = getTopCard target model |> Option.map face
 
         let targetSound =
             match targetFace with

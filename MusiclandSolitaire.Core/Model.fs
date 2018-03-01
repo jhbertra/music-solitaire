@@ -1,8 +1,9 @@
 ﻿module Model
 
-open Core
-open Touch
-open FsGame.Platform
+open FsEssentials.Prelude
+
+open FsGame.Core
+open FsGame.Touch
 
 //
 // --------- Types ---------
@@ -140,7 +141,7 @@ and Overlap = Overlap of Tag * BoundingBox
 
 type Operation =
     | Msg of Msg
-    | Cmd of Cmd<Model, Tag>
+    | Cmd of Cmd<Model, Touch list, Tag>
 
 
 

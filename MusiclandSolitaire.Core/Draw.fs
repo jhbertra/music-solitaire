@@ -1,7 +1,7 @@
 ﻿module Draw
 
-open Core
-open FsGame.Platform
+open FsGame.Core
+
 open Model
 
 //
