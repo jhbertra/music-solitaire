@@ -2,6 +2,9 @@
 
 open FsGame.Core
 
+open Aether
+open Aether.Operators
+
 open Model
 
 //
@@ -231,7 +234,7 @@ let foundations model =
     |> List.collect (
         fun ( suit , position ) ->
             let position = Point position
-            let cards = getFoundation suit model |> cardsInFoundation
+            let cards = model^.(modelFoundation suit >-> foundationCards)
             Area 
               ( "CardBack"
               , position
@@ -260,7 +263,7 @@ let rec drawFannedPile pile position sprite topArea =
 
 
 let tableau tableau ( x , y ) model =
-    let ( Tableau ( up , down ) ) = getTableau tableau model
+    let ( Tableau ( up , down ) ) = model^.(modelTableau tableau)
 
     drawFannedPile 
         down
@@ -318,7 +321,7 @@ let tableaus model =
 
 
 
-let movingOverlap movingFace = function
+let movingOverlap = function
 | Overlap ( { id = TagId.Target target; position = point } , box ) when area box > 4000.0 ->
     StageMove ( target, point ) |> Some
 
@@ -332,8 +335,8 @@ let moving model =
         let bottom = List.head cards
         let position =
             match staging with
-            | Some ( Unstaging ( origin, progress ) ) -> lerp origin movingPosition progress
-            | Some ( Staged ( _, origin, dest, progress , _ , _ ) ) -> lerp origin dest progress
+            | Some ( Unstaging ( UnstagingModel ( origin, progress ) ) ) -> lerp origin movingPosition progress
+            | Some ( Staged ( StagedModel ( _, origin, dest, progress , _ , _ ) ) ) -> lerp origin dest progress
             | None -> movingPosition
 
         Area 
@@ -347,7 +350,7 @@ let moving model =
             touchUpHandler = None
             dragHandler = None
             stopTouchPropagation = false
-            overlapHandler = bottom |> face |> movingOverlap |> Some
+            overlapHandler = Some movingOverlap
             } 
           )
         :: drawFannedPile

@@ -1,9 +1,54 @@
 ﻿module Model
 
-open FsEssentials.Prelude
-
 open FsGame.Core
+
+open FSharpPlus
+open Aether
+open Aether.Operators
+
+
+//
+// --------- Non-Domain ---------
+//
+
+let _1of2 : Lens<'a * 'b, 'a> = (fun (a,_) -> a) , (fun a (_,b) -> (a,b))
+let _2of2 : Lens<'a * 'b, 'b> = (fun (_,b) -> b) , (fun b (a,_) -> (a,b))
+
+let _1of3 : Lens<'a * 'b * 'c, 'a> = (fun (a,_,_) -> a) , (fun a (_,b,c) -> (a,b,c))
+let _2of3 : Lens<'a * 'b * 'c, 'b> = (fun (_,b,_) -> b) , (fun b (a,_,c) -> (a,b,c))
+let _3of3 : Lens<'a * 'b * 'c, 'c> = (fun (_,_,c) -> c) , (fun c (a,b,_) -> (a,b,c))
+
+let _1of4 : Lens<'a * 'b * 'c * 'd, 'a> = (fun (a,_,_,_) -> a) , (fun a (_,b,c,d) -> (a,b,c,d))
+let _2of4 : Lens<'a * 'b * 'c * 'd, 'b> = (fun (_,b,_,_) -> b) , (fun b (a,_,c,d) -> (a,b,c,d))
+let _3of4 : Lens<'a * 'b * 'c * 'd, 'c> = (fun (_,_,c,_) -> c) , (fun c (a,b,_,d) -> (a,b,c,d))
+let _4of4 : Lens<'a * 'b * 'c * 'd, 'd> = (fun (_,_,_,d) -> d) , (fun d (a,b,c,_) -> (a,b,c,d))
+
+
+let _1of5 : Lens<'a * 'b * 'c * 'd * 'e, 'a> = (fun (a,_,_,_,_) -> a) , (fun a (_,b,c,d,e) -> (a,b,c,d,e))
+let _2of5 : Lens<'a * 'b * 'c * 'd * 'e, 'b> = (fun (_,b,_,_,_) -> b) , (fun b (a,_,c,d,e) -> (a,b,c,d,e))
+let _3of5 : Lens<'a * 'b * 'c * 'd * 'e, 'c> = (fun (_,_,c,_,_) -> c) , (fun c (a,b,_,d,e) -> (a,b,c,d,e))
+let _4of5 : Lens<'a * 'b * 'c * 'd * 'e, 'd> = (fun (_,_,_,d,_) -> d) , (fun d (a,b,c,_,e) -> (a,b,c,d,e))
+let _5of5 : Lens<'a * 'b * 'c * 'd * 'e, 'e> = (fun (_,_,_,_,e) -> e) , (fun e (a,b,c,d,_) -> (a,b,c,d,e))
+
+let _1of6 : Lens<'a * 'b * 'c * 'd * 'e * 'f, 'a> = (fun (a,_,_,_,_,_) -> a) , (fun a (_,b,c,d,e,f) -> (a,b,c,d,e,f))
+let _2of6 : Lens<'a * 'b * 'c * 'd * 'e * 'f, 'b> = (fun (_,b,_,_,_,_) -> b) , (fun b (a,_,c,d,e,f) -> (a,b,c,d,e,f))
+let _3of6 : Lens<'a * 'b * 'c * 'd * 'e * 'f, 'c> = (fun (_,_,c,_,_,_) -> c) , (fun c (a,b,_,d,e,f) -> (a,b,c,d,e,f))
+let _4of6 : Lens<'a * 'b * 'c * 'd * 'e * 'f, 'd> = (fun (_,_,_,d,_,_) -> d) , (fun d (a,b,c,_,e,f) -> (a,b,c,d,e,f))
+let _5of6 : Lens<'a * 'b * 'c * 'd * 'e * 'f, 'e> = (fun (_,_,_,_,e,_) -> e) , (fun e (a,b,c,d,_,f) -> (a,b,c,d,e,f))
+let _6of6 : Lens<'a * 'b * 'c * 'd * 'e * 'f, 'f> = (fun (_,_,_,_,_,f) -> f) , (fun f (a,b,c,d,e,_) -> (a,b,c,d,e,f))
+
+let pointX : Lens<Point, float> = (fun (Point (x, _)) -> x) , (fun x (Point (_, y)) -> Point (x,y))
+let pointY : Lens<Point, float> = (fun (Point (_, y)) -> y) , (fun y (Point (x, _)) -> Point (x,y))
+
+let gameTimeElapsed : Lens<GameTime,System.TimeSpan> = (fun gt -> gt.elapsed) , (fun e gt -> { gt with elapsed = e })
+let gameTimeIsRunningSlowly : Lens<GameTime,bool> = (fun gt -> gt.isRunningSlowly) , (fun isRunningSlowly gt -> { gt with isRunningSlowly = isRunningSlowly })
+let gameTimeTotal : Lens<GameTime,System.TimeSpan> = (fun gt -> gt.total) , (fun total gt -> { gt with total = total })
+
+let optionSome : Prism<'a option, 'a> = (id , (fun x -> Some x |> konst))
+
 open FsGame.Touch
+
+let cons x xs = x :: xs
 
 //
 // --------- Types ---------
@@ -33,6 +78,11 @@ type Face =
 
 type Card = Card of Suit * Face
 
+let private cardTuple : Lens<Card, Suit * Face>  = (fun (Card (s,f)) -> (s,f)), (fun tuple' (Card _) -> Card tuple')
+let cardSuit = cardTuple >-> _1of2
+let cardFace = cardTuple >-> _2of2
+
+
 
 type TableauNumber =
     | Tableau1
@@ -49,24 +99,93 @@ type MoveOrigin =
     | Foundation of Suit
     | Tableau of TableauNumber
 
+let triginFoundation : Prism<MoveOrigin, Suit> = (function Foundation s -> Some s | _ -> None) , (fun s _ -> Foundation s)
+let triginTableau : Prism<MoveOrigin, TableauNumber> = (function Tableau t -> Some t | _ -> None) , (fun t _ -> Tableau t)
+
+
 
 type MoveTarget =
     | Foundation of Suit
     | Tableau of TableauNumber
 
+let targetFoundationSuit : Prism<MoveTarget, Suit> = (function Foundation s -> Some s | _ -> None) , (fun s _ -> Foundation s)
+let targetTableauNumber : Prism<MoveTarget, TableauNumber> = (function Tableau t -> Some t | _ -> None) , (fun t _ -> Tableau t)
+
+
 
 type Tableau = Tableau of Card list * Card list
+
+let private tableauTuple : Lens<Tableau, Card list * Card list>  = (fun (Tableau (x,y)) -> (x,y)), (fun tuple' (Tableau _) -> Tableau tuple')
+let tableauFaceUp = tableauTuple >-> _1of2
+let tableauFaceDown = tableauTuple >-> _2of2
+
 
 
 type Foundation = Foundation of Card list * Suit
 
+let private foundationTuple : Lens<Foundation, Card list * Suit>  = (fun (Foundation (x,y)) -> (x,y)), (fun tuple' (Foundation _) -> Foundation tuple')
+let foundationCards = foundationTuple >-> _1of2
+let foundationSuit = foundationTuple >-> _2of2
+
+
+
+type StagedModel = StagedModel of MoveTarget * Point * Point * float * GameTime * bool
+
+let private stagedTuple : Lens<StagedModel, MoveTarget * Point * Point * float * GameTime * bool> =
+    (fun (StagedModel (a,b,c,d,e,f)) -> (a,b,c,d,e,f)), (fun tuple (StagedModel _) -> StagedModel tuple)
+
+let stagedTarget = stagedTuple >-> _1of6
+let stagedOrigin = stagedTuple >-> _2of6
+let stagedDest = stagedTuple >-> _3of6
+let stagedProgress = stagedTuple >-> _4of6
+let stagedTimeStaged = stagedTuple >-> _5of6
+let stagedPlayedSound = stagedTuple >-> _6of6
+
+let stagedTargetFoundationSuit = stagedTarget >-> targetFoundationSuit
+let stagedTargetTableauNumber = stagedTarget >-> targetTableauNumber
+let stagedOriginX = stagedOrigin >-> pointX
+let stagedOriginY = stagedOrigin >-> pointY
+let stagedDestX = stagedDest >-> pointX
+let stagedDestY = stagedDest >-> pointY
+let stagedTimeStagedElapsed = stagedTimeStaged >-> gameTimeElapsed
+let stagedTimeStagedIsRunningSlowly = stagedTimeStaged >-> gameTimeIsRunningSlowly
+let stagedTimeStagedTotal = stagedTimeStaged >-> gameTimeTotal
+
+
+
+
+type UnstagingModel = UnstagingModel of Point * float
+
+let private unstagingTuple : Lens<UnstagingModel, Point * float> =
+    (fun (UnstagingModel (a,b)) -> (a,b)), (fun tuple (UnstagingModel _) -> UnstagingModel tuple)
+
+let unstagingDest = unstagingTuple >-> _1of2
+let unstagingProgress = unstagingTuple >-> _2of2
+
+let unstagingDestX = unstagingDest >-> pointX
+let unstagingDestY = unstagingDest >-> pointY
+
+
 
 type Staging =
-    | Staged of MoveTarget * Point * Point * float * GameTime * bool
-    | Unstaging of Point * float
+    | Staged of StagedModel
+    | Unstaging of UnstagingModel
+
+let staged : Prism<Staging, StagedModel> =
+    (function Staged s -> Some s | _ -> None) , (fun s _ -> Staged s)
+let unstaging : Prism<Staging,UnstagingModel> =
+    (function Unstaging u -> Some u | _ -> None), (fun u _ -> Unstaging u)
+
 
 
 type Hand = MoveOrigin * Card list * Point * int * Staging option
+
+let handOrigin : Lens<Hand, MoveOrigin>= _1of5
+let handCards : Lens<Hand, Card list>= _2of5
+let handLocation : Lens<Hand, Point>= _3of5
+let handTouchId : Lens<Hand, int>= _4of5
+let handStaging : Lens<Hand, Staging option>= _5of5
+
 
 
 type Model = {
@@ -90,6 +209,23 @@ type Model = {
     pendingGestures : PendingGesture list
     previousTouches : Touch list
     }
+
+let modelTalon : Lens<Model, Card list> = (fun m -> m.talon) , (fun t m -> { m with talon = t })
+let modelStock : Lens<Model, Card list> = (fun m -> m.stock) , (fun t m -> { m with stock = t })
+let modelFoundation : Suit -> Lens<Model, Foundation> = function
+| Hearts -> (fun m -> m.heartsFoundation) , (fun (Foundation (cards,_)) m -> { m with heartsFoundation = Foundation (cards,Hearts) })
+| Spades -> (fun m -> m.spadesFoundation) , (fun (Foundation (cards,_)) m -> { m with spadesFoundation = Foundation (cards,Spades) })
+| Diamonds -> (fun m -> m.diamondsFoundation) , (fun (Foundation (cards,_)) m -> { m with diamondsFoundation = Foundation (cards,Diamonds) })
+| Clubs -> (fun m -> m.heartsFoundation) , (fun (Foundation (cards,_)) m -> { m with heartsFoundation = Foundation (cards,Clubs) })
+let modelTableau : TableauNumber -> Lens<Model, Tableau> = function
+| Tableau1 -> (fun m -> m.tableau1) , (fun t m -> { m with tableau1 = t })
+| Tableau2 -> (fun m -> m.tableau2) , (fun t m -> { m with tableau2 = t })
+| Tableau3 -> (fun m -> m.tableau3) , (fun t m -> { m with tableau3 = t })
+| Tableau4 -> (fun m -> m.tableau4) , (fun t m -> { m with tableau4 = t })
+| Tableau5 -> (fun m -> m.tableau5) , (fun t m -> { m with tableau5 = t })
+| Tableau6 -> (fun m -> m.tableau6) , (fun t m -> { m with tableau6 = t })
+| Tableau7 -> (fun m -> m.tableau7) , (fun t m -> { m with tableau7 = t })
+
 
 
 type DealState = {
@@ -149,11 +285,6 @@ type Operation =
 // --------- Functions ---------
 //
 
-let suit ( Card ( suit , _ ) ) = suit
-
-
-let face ( Card ( _ , face ) ) = face
-
 
 let suits = [ Hearts; Clubs; Diamonds; Spades ]
 
@@ -172,115 +303,33 @@ let tableauNumber = function
 | _ -> raise (System.ArgumentOutOfRangeException())
 
 
-let faceUp (Tableau (up,_)) = up
-
-
-let faceDown (Tableau (_,down)) = down
-
-
 let initTableau = Tableau ([],[])
 
 
 let initFoundation suit = Foundation ( [] , suit )
 
 
-let getTableauDealMoves state = state.tableauDealMoves
+let pushCardToFoundation = Optic.map foundationCards << cons
 
 
-let getModel state = state.model
+let pushCardToTalon = Optic.map modelTalon << cons
 
 
-let setTableauDealMoves tableauDealMoves state = { state with tableauDealMoves = tableauDealMoves }
 
-
-let setModel model (state : DealState) = { state with model = model }
-
-
-let setTableau tableau newTableau model = 
-    match tableau with
-    | Tableau1 -> { model with tableau1 = newTableau }
-    | Tableau2 -> { model with tableau2 = newTableau }
-    | Tableau3 -> { model with tableau3 = newTableau }
-    | Tableau4 -> { model with tableau4 = newTableau }
-    | Tableau5 -> { model with tableau5 = newTableau }
-    | Tableau6 -> { model with tableau6 = newTableau }
-    | Tableau7 -> { model with tableau7 = newTableau }
-
-
-let getTableau tableau model = 
-    match tableau with
-    | Tableau1 -> model.tableau1
-    | Tableau2 -> model.tableau2
-    | Tableau3 -> model.tableau3
-    | Tableau4 -> model.tableau4
-    | Tableau5 -> model.tableau5
-    | Tableau6 -> model.tableau6
-    | Tableau7 -> model.tableau7
-
-
-let modifyTableau tableau f model = getTableau tableau model |> f |> (flip (setTableau tableau)) model
-
-
-let setFoundation suit newCards model  =
-    match suit with
-    | Hearts -> { model with heartsFoundation = Foundation ( newCards , suit ) }
-    | Spades -> { model with spadesFoundation = Foundation ( newCards , suit ) }
-    | Diamonds -> { model with diamondsFoundation = Foundation ( newCards , suit ) }
-    | Clubs -> { model with clubsFoundation = Foundation ( newCards , suit ) }
-
-
-let getFoundation suit model =
-    match suit with
-    | Hearts -> model.heartsFoundation
-    | Spades -> model.spadesFoundation
-    | Diamonds -> model.diamondsFoundation
-    | Clubs -> model.clubsFoundation
-
-
-let cardsInFoundation (Foundation ( cards , _ )) = cards
-
-
-let modifyFoundation suit f model = 
-    let (Foundation ( cards , _ )) = getFoundation suit model
-    f cards |> (flip (setFoundation suit)) model
-
-
-let modifyTalon f model = { model with talon = f model.talon }
-
-
-let modifyStock f model = { model with stock = f model.stock }
-
-
-let pushCardToFoundation foundation card = modifyFoundation foundation (card |> applyT2 List.Cons)
-
-
-let pushCardToTalon card = modifyTalon (card |> applyT2 List.Cons)
-
-
-let pushCardToStock card = modifyStock (card |> applyT2 List.Cons)
+let pushCardToStock = Optic.map modelStock << cons
 
 
 let updateTableau faceUp card (Tableau (up,down)) = Tableau (if faceUp then card::up,down else up,card::down)
 
 
-let pushCardToTableau tableau faceUp card = updateTableau faceUp card |> modifyTableau tableau
+let pushCardToTableau tableau up = Optic.map (modelTableau tableau >-> if up then tableauFaceUp else tableauFaceDown) << cons
 
 
-let getTopCard target model =
+let getTopCard target =
     match target with
-    | MoveTarget.Foundation f -> getFoundation f model |> cardsInFoundation
-    | MoveTarget.Tableau t -> getTableau t model |> faceUp
-    |> List.tryHead
-
-
-let setTableauFaceUp tableau model newFaceUp =
-    modifyTableau 
-        tableau
-        (fun (Tableau (_,down)) -> Tableau (newFaceUp,down))
-        model
-
-
-let modifyTableauFaceUp tableau f model = getTableau tableau model |> faceUp |> f |> setTableauFaceUp tableau model
+    | MoveTarget.Foundation f -> Optic.get ((modelFoundation f) >-> foundationCards)
+    | MoveTarget.Tableau t -> Optic.get ((modelTableau t) >-> tableauFaceUp)
+    >> List.tryHead
 
 
 let asTableauModifier f (Tableau (up, down)) = (up, down) |> f |> Tableau

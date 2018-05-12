@@ -1,5 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
@@ -10,7 +10,8 @@
     <Compile Include="Engine.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FsGame.Core" Version="1.0.1" />
-    <PackageReference Include="FsEssentials_jhbertra" Version="1.0.3" />
+    <PackageReference Include="FSharpPlus" Version="1.0.0-RC2" />
+    <PackageReference Include="Aether" Version="8.2.0" />
+    <PackageReference Include="FsGame.Core" Version="1.0.2" />
   </ItemGroup>
 </Project>

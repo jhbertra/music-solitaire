@@ -1,10 +1,11 @@
 ﻿module UseCases
 
-open FsEssentials
-open Prelude
+open Aether
+open Aether.Operators
+open FSharpPlus
+open FSharpPlus.Operators
 
 open FsGame.Core
-open FsGame.Touch
 
 open Model
 
@@ -15,29 +16,40 @@ open Model
 let returnModel model = ( model , [] )
 
 
+let shuffleArr (rng: System.Random) arr =
+    let array = Array.copy arr
+    let n = array.Length
+    for x in 1..n do
+        let i = n-x
+        let j = rng.Next(i+1)
+        let tmp = array.[i]
+        array.[i] <- array.[j]
+        array.[j] <- tmp
+    array
+
+
 
 //
 // --------- Init ---------
 //
 
 let rec deal dealState = function
-| [] -> getModel dealState
+| [] -> dealState.model
 | card :: cards ->
-    let tableauDealMoves = getTableauDealMoves dealState
-    let model = getModel dealState
-
-    let dealState = 
-        match tableauDealMoves with
-        | [] -> setModel (model |> pushCardToStock card ) dealState
+    let dealState =
+        match dealState.tableauDealMoves with
+        | [] -> { dealState with model = (dealState.model |> pushCardToStock card ) }
 
         | (tableau, faceUp) :: moves ->
-           setTableauDealMoves moves dealState
-           |> setModel (model |> pushCardToTableau tableau faceUp card)
+            { dealState with
+                tableauDealMoves = moves
+                model = pushCardToTableau tableau faceUp card dealState.model
+            }
 
     deal dealState cards
 
 
-let initialize rng = 
+let initialize rng =
 
     let model = {
         won = false
@@ -61,14 +73,14 @@ let initialize rng =
         previousTouches = []
         }
 
-    let deck = 
+    let deck =
         [ for suit in suits do for face in faces do yield Card ( suit , face ) ]
         |> Array.ofList
         |> shuffleArr rng
         |> List.ofArray
 
     let dealingState = {
-        tableauDealMoves = 
+        tableauDealMoves =
             let numberOrder = [1..7]
             numberOrder |> List.collect (fun i -> (List.skip (i-1) numberOrder) |> List.mapi (fun j num -> tableauNumber num,j=0))
         model = model
@@ -82,59 +94,44 @@ let initialize rng =
 // --------- Logic to Evaluate Every Frame ---------
 //
 
-let step gameTime wrapOperation model =
-    let move gameTime progress = 
+let step gameTime model =
+    let move gameTime progress =
         let speed = (10.0 - 30.0) * progress + 30.0
         let step = ((float gameTime.elapsed.TotalMilliseconds) * 0.001) * speed
         min 1.0 (progress + step)
 
     match model.hand with
-    | Some ( o , c , p , i , Some ( Unstaging ( origin , progress ) ) ) ->
-        let progress = move gameTime progress
-        let staging = 
-            if progress = 1.0 then 
-                  None 
-              else 
-                  Some ( Unstaging ( origin, progress ) )
+    | Some hand ->
+        match hand^.handStaging with
+        | Some (Unstaging unstaging) ->
+            let progress = move gameTime (unstaging^.unstagingProgress)
+            let staging =
+                if progress = 1.0 then
+                      None
+                  else
+                      Some ( Unstaging unstaging )
 
-        returnModel { model with hand = Some ( o , c , p , i , staging ) }
+            returnModel { model with hand = hand |> (staging ^= handStaging) |> Some }
 
-    | Some ( o , cards , handPos , i , Some ( Staged ( target , origin , dest , progress , timeStaged , playedSound ) ) )
-        when distance handPos dest |> abs <= 56.0 ->
-        let progress = move gameTime progress
+        | Some (Staged s) when distance (hand^.handLocation) (s^.stagedDest) |> abs <= 56.0 ->
+            let progress = move gameTime (s^.stagedProgress)
 
-        let model = 
-            { model with
-                hand =
-                    Some 
-                      ( o 
-                      , cards 
-                      , handPos 
-                      , i 
-                      , Some 
-                        ( Staged 
-                            ( target 
-                            , origin 
-                            , dest 
-                            , progress 
-                            , timeStaged 
-                            , playedSound 
-                            ) 
-                        ) 
-                      ) 
-              }
-        
-        if playedSound = false && gameTime.total.TotalMilliseconds - timeStaged.total.TotalMilliseconds >= 500.0 then
-            ( model, [ Msg ( PlayMoveSound [] ) ] )
-        else
-            returnModel model
+            let model = { model with hand = hand |> (progress ^= (handStaging >-> optionSome >?> staged >?> stagedProgress)) |> Some }
 
-    | Some ( o , cards , handPos , i , Some ( Staged ( target , origin , dest , progress , timeStaged , playedSound ) ) ) ->
-        ( model
-        , [ Msg UnstageMove ]
-        )    
+            if not (s^.stagedPlayedSound) && gameTime.total.TotalMilliseconds - (s^.stagedTimeStaged).total.TotalMilliseconds >= 500.0 then
+                ( model, [ Msg ( PlayMoveSound [] ) ] )
+            else
+                returnModel model
+        | Some _ ->
+            ( model
+            , [ Msg UnstageMove ]
+            )
+
+        | _ -> returnModel model
 
     | _ -> returnModel model
+
+
 
 
 
@@ -143,67 +140,57 @@ let step gameTime wrapOperation model =
 //
 
 let playMoveSound wrapOperation nextMsgs model =
-    match model.hand with
-    | Some ( o , cards , handPos , i , Some ( Staged ( target , origin , dest , progress , timeStaged , false ) ) ) ->
-        let newHand = 
-            Some 
-              ( o 
-              , cards 
-              , handPos 
-              , i 
-              , Some 
-                ( Staged 
-                    ( target 
-                    , origin 
-                    , dest 
-                    , progress 
-                    , timeStaged 
-                    , true 
-                    ) 
-                ) 
-              )
+    monad {
+        let! hand = model.hand^.Option.value_
+        let! staged = hand^.(handStaging >-> Option.value_ >?> staged)
+        if not (staged^.stagedPlayedSound) then
+            let targetFace = getTopCard (staged^.stagedTarget) model |> map (Optic.get cardFace)
 
-        let targetFace = getTopCard target model |> Option.map face
+            let targetSound =
+                match targetFace with
+                | None | Some KeySignature -> None
+                | Some face -> getFaceContent face |> Some
 
-        let targetSound =
-            match targetFace with
-            | None | Some KeySignature -> None
-            | Some face -> getFaceContent face |> Some
+            let movingSound = List.last (hand^.handCards) |> Optic.get cardFace |> getFaceContent
 
-        let movingSound = List.last cards |> face |> getFaceContent 
+            let newHand = hand |> Optic.set handStaging (staged |> Optic.set stagedPlayedSound true |> Staged |> Some)
 
-        ( { model with hand = newHand }
-        , nextMsgs
-          @ match ( targetSound ) with
-             | ( Some sound ) ->
-                   [
-                   Cmd ( PlaySound ( sound , SoundMode.Overlap , 1.0 ) )
-                   Cmd 
-                     ( Delay 
-                         ( 0.33
-                         , Cmd 
-                             ( PlaySound 
-                                 ( movingSound 
-                                 , (if movingSound = getFaceContent KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) 
-                                 , 1.0 
-                                 ) 
-                             )  |> wrapOperation 
-                         ) 
-                     )
-                   ]
+            return
+                ( { model with hand = Some newHand }
+                , nextMsgs
+                  @ match ( targetSound ) with
+                     | ( Some sound ) ->
+                           [
+                           Cmd ( PlaySound ( sound , SoundMode.Overlap , 1.0 ) )
+                           Cmd
+                             ( Delay
+                                 ( 0.33
+                                 , Cmd
+                                     ( PlaySound
+                                         ( movingSound
+                                         , (if movingSound = getFaceContent KeySignature then SoundMode.NoOverlap else SoundMode.Overlap)
+                                         , 1.0
+                                         )
+                                     )  |> wrapOperation
+                                 )
+                             )
+                           ]
 
-             | None -> 
-                   [
-                   Cmd 
-                     ( PlaySound 
-                        ( movingSound 
-                        , (if movingSound = getFaceContent KeySignature then SoundMode.NoOverlap else SoundMode.Overlap) 
-                        , 1.0 
-                        ) 
-                     )
-                   ]
-        )
-    | _ -> ( model , nextMsgs )
+                     | None ->
+                           [
+                           Cmd
+                             ( PlaySound
+                                ( movingSound
+                                , (if movingSound = getFaceContent KeySignature then SoundMode.NoOverlap else SoundMode.Overlap)
+                                , 1.0
+                                )
+                             )
+                           ]
+                )
+        else
+            return returnModel model
+    }
+    |> Option.defaultValue ( model , nextMsgs )
 
 
 //
@@ -212,16 +199,13 @@ let playMoveSound wrapOperation nextMsgs model =
 
 let popStock model =
     match (model.popReady),(model.stock) with
-    | false,_ -> model
-
-    | true,[] -> model
-
-    | true,(head::tail) -> 
+    | true,(head::tail) ->
         { model with
             stock = tail
             talon = head :: model.talon
             popReady = false
         }
+    | _ -> model
 
 
 
@@ -229,8 +213,8 @@ let popStock model =
 // --------- Refill Empty Stock With Talon ---------
 //
 
-let recycleTalon model = 
-    match model.stock with 
+let recycleTalon model =
+    match model.stock with
     | [] -> { model with talon = []; stock = List.rev model.talon }
     | _ -> model
 
@@ -240,25 +224,16 @@ let recycleTalon model =
 // --------- Pick Up Cards From Talon, Foundation, or Tableau ---------
 //
 
-let pickUpCards origin count pos id model =
-    match ( model.hand , origin , count ) with
-    | None , MoveOrigin.Talon , 1 ->
-        { modifyTalon (List.skip 1) model with
-            hand = Some ( origin , List.take 1 model.talon , pos , id , None )
-            }
+let pickUpCards origin count pos identifier model =
+    let cardsLens =
+        match (model.hand, origin, count) with
+        | (None, MoveOrigin.Talon , 1) -> modelTalon
+        | (None, MoveOrigin.Foundation s , 1) -> modelFoundation s >-> foundationCards
+        | (None, MoveOrigin.Tableau t , _) -> modelTableau t >-> tableauFaceUp
+        | _ -> (konst [], konst id)
 
-    | None , MoveOrigin.Foundation suit , 1 ->
-        { modifyFoundation suit (List.skip 1) model with
-            hand = Some ( origin , getFoundation suit model |> cardsInFoundation |> List.take 1 , pos , id , None )
-            }
-
-    | None, MoveOrigin.Tableau tableau, n when n <= (getTableau tableau model |> faceUp |> List.length) && n > 0 ->
-        { modifyTableauFaceUp tableau (List.skip n) model with
-            hand = Some ( origin , getTableau tableau model |> faceUp |> List.take n , pos , id , None )
-            }
-
-    | _ -> model
-
+    { Optic.map cardsLens (List.skip count) model with
+        hand = Some(origin, model^.cardsLens |> List.take count, pos, identifier, None) }
 
 
 //
@@ -281,20 +256,18 @@ let moveHand touchId ( Delta ( x , y ) ) model =
 //
 
 let cancelMove model =
-    let hand = model.hand
-    let model = { model with hand = None }
+    monad {
+        let! hand = model.hand
+        let model = { model with hand = None }
+        let updateCards = (@) (hand^.handCards)
+        let cardsLens =
+            match hand^.handOrigin with
+            | MoveOrigin.Talon -> modelTalon
+            | MoveOrigin.Foundation s -> modelFoundation s >-> foundationCards
+            | MoveOrigin.Tableau t -> modelTableau t >-> tableauFaceUp
 
-    match hand with
-    | Some ( MoveOrigin.Talon , cards , _ , id , _ ) -> 
-        modifyTalon ( (@) cards ) model
-
-    | Some ( MoveOrigin.Foundation foundation , cards , _ , id , _ ) -> 
-        modifyFoundation foundation ( (@) cards ) model
-
-    | Some ( MoveOrigin.Tableau tableau , cards , _ , id , _ ) -> 
-        modifyTableauFaceUp tableau ( (@) cards ) model
-
-    | None -> model
+        return Optic.map cardsLens updateCards model }
+    |> Option.defaultValue model
 
 
 
@@ -303,13 +276,10 @@ let cancelMove model =
 //
 
 let stageMove target point gameTime model =
-    match model.hand with
-    | Some ( origin , cards , movingPos , id , None ) -> 
-        let movingFace = List.last cards |> Model.face
-
-        { model with hand = Some ( origin , cards , movingPos , id , Some ( Staged ( target, movingPos, point, 0.0 , gameTime , false ) ) ) }
-
-    | _ -> model
+    { model with
+        hand = model.hand
+            |> Option.filter (Optic.get handStaging >> Option.isNone)
+            |> Option.map (fun hand -> Optic.set handStaging (Some(Staged(StagedModel(target, hand^.handLocation, point, 0.0, gameTime, false)))) hand) }
 
 
 
@@ -318,11 +288,14 @@ let stageMove target point gameTime model =
 //
 
 let unstageMove model =
-    match model.hand with
-    | Some ( o , c , p , i , Some ( Staged (  moveTarget, origin, dest, progress , _, _ ) ) ) -> 
-        { model with hand = Some ( o , c , p , i , Some ( Unstaging ( lerp origin dest progress, 0.0 ) ) ) }
-
-    | _ -> model
+    { model with
+        hand = monad {
+            let! hand = model.hand
+            let! s = hand^.(handStaging >-> optionSome >?> staged)
+            let origin = s^.stagedOrigin
+            let dest = s^.stagedDest
+            let progress = s^.stagedProgress
+            return hand |> Optic.set (handStaging >-> optionSome >?> unstaging) (UnstagingModel (lerp origin dest progress, 0.0)) } }
 
 
 
@@ -331,28 +304,31 @@ let unstageMove model =
 //
 
 let commitMove touchId model =
-    match model.hand with
-    | Some ( _ , cards , _ , id , Some ( Staged ( target, _, _, _ , _ , false ) ) ) when touchId = id ->
-        ( model , [ Msg ( PlayMoveSound [ CommitMove touchId ] ) ] )
+    monad {
+        let! hand = model.hand
+        let handId = hand^.handTouchId
+        let! s = hand^.(handStaging >-> optionSome >?> staged) |> filter (touchId = handId |> konst)
+        if s^.stagedPlayedSound then
+            return
+                match ( hand^.handCards , s^.stagedTarget ) with
 
-    | Some ( _ , cards , _ , id , Some ( Staged ( target, _, _, _ , _ , true ) ) ) when touchId = id ->
+                | [card] , MoveTarget.Foundation f when canPlaceOnFoundation (model^.(modelFoundation f)) card ->
+                    ( Optic.map (modelFoundation f) (pushCardToFoundation card) { model with hand = None }
+                    , [ Msg MoveCommitted ]
+                    )
 
-        match ( cards , target ) with
+                | cards , MoveTarget.Tableau t when canPlaceOnTableau (model^.(modelTableau t >-> tableauFaceUp)) cards ->
+                    ( Optic.map (modelTableau t >-> tableauFaceUp) ((@) cards) { model with hand = None }
+                    , [Msg MoveCommitted]
+                    )
 
-        | [card] , MoveTarget.Foundation foundation when canPlaceOnFoundation (getFoundation foundation model) card ->
-            let face = face card
-            ( pushCardToFoundation foundation card { model with hand = None }
-            , [ Msg MoveCommitted ]
-            )
-                
-        | cards , MoveTarget.Tableau tableau when canPlaceOnTableau (getTableau tableau model |> faceUp) cards ->
-            ( modifyTableauFaceUp tableau ((@) cards) { model with hand = None } , [Msg MoveCommitted] )
-
-        | _ -> ( model , [ Msg CancelMove ] )
-    
-    | Some ( _ , _ , _ , id , None ) -> ( model , [Msg CancelMove] )
-
-    | _ -> returnModel model
+                | _ -> ( model , [ Msg CancelMove ] )
+        else
+            return ( model , [ Msg ( PlayMoveSound [ CommitMove touchId ] ) ] ) }
+    <|> monad {
+        let! _ = model.hand |> filter (Optic.get handStaging >> Option.isNone)
+        return ( model , [Msg CancelMove] ) }
+    |> Option.defaultValue (returnModel model)
 
 
 
@@ -361,18 +337,20 @@ let commitMove touchId model =
 //
 
 let checkForWin wrapOperation model =
-    let foundations = suits |> List.map ((flip getFoundation) model) |> List.map cardsInFoundation
+    let foundations =
+        suits
+        |> List.map (modelFoundation >> (flip Compose.lens) foundationCards >> (flip Optic.get) model)
 
     if foundations |> List.map List.length = [12;12;12;12] then
         ( { model with won = true }
         , [Cmd ( Delay ( 1.0 , wrapOperation ( Cmd ( PlaySound ( "Stack" , NoOverlap , 1.0 ) ) ) ) )]
         )
-    else 
+    else
         model
-        |> modifyTableau Tableau2 replenish
-        |> modifyTableau Tableau3 replenish
-        |> modifyTableau Tableau4 replenish
-        |> modifyTableau Tableau5 replenish
-        |> modifyTableau Tableau6 replenish
-        |> modifyTableau Tableau7 replenish
+        |> Optic.map (modelTableau Tableau2) replenish
+        |> Optic.map (modelTableau Tableau3) replenish
+        |> Optic.map (modelTableau Tableau4) replenish
+        |> Optic.map (modelTableau Tableau5) replenish
+        |> Optic.map (modelTableau Tableau6) replenish
+        |> Optic.map (modelTableau Tableau7) replenish
         |> returnModel

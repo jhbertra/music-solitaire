@@ -1,17 +1,24 @@
 module Engine
 
-open FsEssentials
+open FSharpPlus
+open FSharpPlus.Data
+open FSharpPlus.Operators
 
+open FsGame
 open FsGame.Core
-open FsGame.Touch
 
 open Model
 open Draw
 
+let optionToSingletonList = function
+| Some a -> [a]
+| None -> []
+
 let returnModel = UseCases.returnModel
 
-let (<*>) = Option.(<*>)
-let (<?>) = Option.(<?>)
+let evalState initial (State f) = f initial |> fst
+
+let modify<'a> (f : 'a -> 'a) : State<'a,unit> = get >>= (put << f)
 
 let processMessage msg model gameTime wrapOperation =
     if model.won && msg <> Reset then
@@ -19,7 +26,7 @@ let processMessage msg model gameTime wrapOperation =
     else
         match msg with
 
-        | Step -> UseCases.step gameTime wrapOperation model
+        | Step -> UseCases.step gameTime model
 
         | Reset -> UseCases.initialize model.rng |> returnModel
 
@@ -57,10 +64,10 @@ let rec messagesFromGesture objects (id,gestureType) =
     | {tag = tag; box = box}::os ->
         let handler,hitPos =
             match gestureType with
-            | GestureType.Tap pos -> tag.tapHandler <?> id, pos
-            | GestureType.TouchDown pos -> tag.touchDownHandler <?> id, pos
-            | GestureType.TouchUp pos -> tag.touchUpHandler <?> id, pos
-            | GestureType.Drag (startPos,delta) -> tag.dragHandler <?> id <?> delta, startPos
+            | Touch.GestureType.Tap pos -> tag.tapHandler <*> Some id, pos
+            | Touch.GestureType.TouchDown pos -> tag.touchDownHandler <*> Some id, pos
+            | Touch.GestureType.TouchUp pos -> tag.touchUpHandler <*> Some id, pos
+            | Touch.GestureType.Drag (startPos,delta) -> tag.dragHandler <*> Some id <*> Some delta, startPos
         
         let result = handler <*> pointInBox hitPos box
 
@@ -75,17 +82,17 @@ let rec messagesFromGesture objects (id,gestureType) =
 let rec overlaps id box = function
 | { box = box2; tag = tag2 } :: os when id <> tag2.id ->
     (intersect box box2
-    |> Option.map (fun overlap -> Overlap (tag2,overlap))
-    |> Option.toSingletonList)
+    |> map (fun overlap -> Overlap (tag2,overlap))
+    |> optionToSingletonList)
     @ overlaps id box os
 | _ -> []
 
 let rec messagesFromObjects = function
 | [] -> []
-| { tag = { id = id; overlapHandler = Some handler }; box = box } :: os ->
-    overlaps id box os
+| { tag = { id = tagId; overlapHandler = Some handler }; box = box } :: os ->
+    overlaps tagId box os
     |> List.map handler
-    |> Option.filterNone
+    |> List.choose id
     |> List.append (messagesFromObjects os)
 | _ :: os -> messagesFromObjects os
 
@@ -96,13 +103,13 @@ let setModel model (UpdateResult (_,cmds)) = UpdateResult (model,cmds)
 let addCommands commands (UpdateResult (model,cmds)) = UpdateResult (model,cmds @ commands)
 
 let getModel = 
-    State.state { 
-        let! UpdateResult (model,_) = State.get
+    monad { 
+        let! UpdateResult (model,_) = get
         return model 
     }
 
 let rec sendMessages gameTime = function
-| [] -> State.get
+| [] -> get
 | msg::msgs ->
 
     let rec messages = function
@@ -115,35 +122,35 @@ let rec sendMessages gameTime = function
     | (Msg _) :: ops -> commands ops
     | (Cmd cmd) :: ops -> cmd :: commands ops
 
-    State.state {
+    monad {
         let! model = getModel
         let model,nextOperations = processMessage msg model gameTime wrapOperation
-        do! State.modify (setModel model)
-        do! commands nextOperations |> addCommands |> State.modify
+        do! modify (setModel model)
+        do! commands nextOperations |> addCommands |> modify
         return! sendMessages gameTime ((messages nextOperations) @ msgs)
     }
 
 
 and wrapOperation = function
-| Msg msg -> fun {model=model; gameTime = gameTime} -> sendMessages gameTime [msg] |> State.eval (UpdateResult (returnModel model))
+| Msg msg -> fun {model=model; gameTime = gameTime} -> sendMessages gameTime [msg] |> evalState (UpdateResult (returnModel model))
 | Cmd cmd -> fun {model=model} -> UpdateResult (model, [cmd])
 
 
-let update (gameState : GameState<Model, Touch list, Tag>) : UpdateResult<Model, Touch list, Tag> =
+let update (gameState : GameState<Model, Touch.Touch list, Tag>) : UpdateResult<Model, Touch.Touch list, Tag> =
 
     let gestureResults =
-        touchEvents gameState.model.previousTouches gameState.controller gameState.gameTime
-        |> processEvents gameState.model.pendingGestures
+        Touch.touchEvents gameState.model.previousTouches gameState.controller gameState.gameTime
+        |> Touch.processEvents gameState.model.pendingGestures
 
     let model = 
         { gameState.model with
-            pendingGestures = pendingGestures gestureResults
+            pendingGestures = Touch.pendingGestures gestureResults
             previousTouches = gameState.controller
             }
 
-    messages (List.rev gameState.objects) (gestures gestureResults) gameState.gameTime 
+    messages (List.rev gameState.objects) (Touch.gestures gestureResults) gameState.gameTime 
     |> sendMessages gameState.gameTime
-    |> State.eval (UpdateResult (returnModel model))
+    |> evalState (UpdateResult (returnModel model))
 
 
 let engine (rng : System.Random) = {
