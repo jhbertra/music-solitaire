@@ -529,10 +529,13 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="FsGame.Core">
-      <HintPath>..\packages\FsGame.Core.1.0.1\lib\netstandard2.0\FsGame.Core.dll</HintPath>
+      <HintPath>..\packages\FsGame.Core.1.0.2\lib\netstandard2.0\FsGame.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharpPlus">
+      <HintPath>..\packages\FSharpPlus.1.0.0\lib\netstandard2.0\FSharpPlus.dll</HintPath>
     </Reference>
     <Reference Include="FsGame.iOS">
-      <HintPath>..\packages\FsGame.iOS.1.0.1\lib\xamarinios10\FsGame.iOS.dll</HintPath>
+      <HintPath>..\packages\FsGame.iOS.1.0.3\lib\xamarinios10\FsGame.iOS.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
