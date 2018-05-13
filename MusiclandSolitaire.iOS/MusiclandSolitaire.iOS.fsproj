@@ -18,7 +18,7 @@
     <OutputPath>bin\iPhoneSimulator\Debug</OutputPath>
     <DefineConstants>DEBUG;ENABLE_TEST_CLOUD</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
-    <CodesignKey>iPhone Developer</CodesignKey>
+    <CodesignKey>iPhone Developer: James Bertram (DK3V32V23W)</CodesignKey>
     <MtouchDebug>true</MtouchDebug>
     <MtouchNoSymbolStrip>true</MtouchNoSymbolStrip>
     <MtouchFastDev>true</MtouchFastDev>
@@ -28,6 +28,7 @@
     <MtouchHttpClientHandler>HttpClientHandler</MtouchHttpClientHandler>
     <DeviceSpecificBuild>false</DeviceSpecificBuild>
     <MtouchVerbosity></MtouchVerbosity>
+<CodesignProvision>VS: com.ycmused.MusiclandSolitaire Development</CodesignProvision>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|iPhone' ">
     <Optimize>true</Optimize>
@@ -97,9 +98,15 @@
     <Reference Include="FsGame.iOS">
       <HintPath>..\packages\FsGame.iOS.1.0.4\lib\xamarinios10\FsGame.iOS.dll</HintPath>
     </Reference>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="Aether">
+      <HintPath>..\packages\Aether.8.2.0\lib\netstandard1.6\Aether.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resources\" />
+    <Folder Include="Content\" />
   </ItemGroup>
   <ItemGroup>
     <ImageAsset Include="Assets.xcassets\AppIcon.appiconset\Contents.json" />
@@ -107,13 +114,53 @@
     <InterfaceDefinition Include="LaunchScreen.storyboard" />
     <None Include="Info.plist" />
     <None Include="Entitlements.plist" />
-    <InterfaceDefinition Include="Main.storyboard" />
-    <Compile Include="ViewController.fs" />
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
+    <None Include="Content\ContentProject.mgcb" />
+    <Content Include="Content\sfx\Do.xnb" />
+    <Content Include="Content\sfx\Do_Sus.xnb" />
+    <Content Include="Content\sfx\Do8.xnb" />
+    <Content Include="Content\sfx\Do8_Sus.xnb" />
+    <Content Include="Content\sfx\Fa.xnb" />
+    <Content Include="Content\sfx\Fa_Sus.xnb" />
+    <Content Include="Content\sfx\I.xnb" />
+    <Content Include="Content\sfx\I_Sus.xnb" />
+    <Content Include="Content\sfx\IV.xnb" />
+    <Content Include="Content\sfx\IV_Sus.xnb" />
+    <Content Include="Content\sfx\Ks.xnb" />
+    <Content Include="Content\sfx\La.xnb" />
+    <Content Include="Content\sfx\La_Sus.xnb" />
+    <Content Include="Content\sfx\Mi.xnb" />
+    <Content Include="Content\sfx\Mi_Sus.xnb" />
+    <Content Include="Content\sfx\Re.xnb" />
+    <Content Include="Content\sfx\Re_Sus.xnb" />
+    <Content Include="Content\sfx\So.xnb" />
+    <Content Include="Content\sfx\So_Sus.xnb" />
+    <Content Include="Content\sfx\Stack.xnb" />
+    <Content Include="Content\sfx\Ti.xnb" />
+    <Content Include="Content\sfx\Ti_Sus.xnb" />
+    <Content Include="Content\sfx\V.xnb" />
+    <Content Include="Content\sfx\V_Sus.xnb" />
+    <Content Include="Content\textures\CardBack.xnb" />
+    <Content Include="Content\textures\Clubs.xnb" />
+    <Content Include="Content\textures\Diamonds.xnb" />
+    <Content Include="Content\textures\Do.xnb" />
+    <Content Include="Content\textures\Do8.xnb" />
+    <Content Include="Content\textures\Fa.xnb" />
+    <Content Include="Content\textures\Hearts.xnb" />
+    <Content Include="Content\textures\I.xnb" />
+    <Content Include="Content\textures\IV.xnb" />
+    <Content Include="Content\textures\Ks.xnb" />
+    <Content Include="Content\textures\La.xnb" />
+    <Content Include="Content\textures\Mi.xnb" />
+    <Content Include="Content\textures\Re.xnb" />
+    <Content Include="Content\textures\Reset.xnb" />
+    <Content Include="Content\textures\So.xnb" />
+    <Content Include="Content\textures\Spades.xnb" />
+    <Content Include="Content\textures\Table.xnb" />
+    <Content Include="Content\textures\Ti.xnb" />
+    <Content Include="Content\textures\V.xnb" />
     <ProjectReference Include="..\MusiclandSolitaire.Core\MusiclandSolitaire.Core.fsproj">
       <Project>{9F95C722-1018-471A-9295-A41E9F2C1CB6}</Project>
       <Name>MusiclandSolitaire.Core</Name>

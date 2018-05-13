@@ -1,8 +1,6 @@
 
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "MusiclandSolitaire", "MusicSolitaireDemo\MusiclandSolitaire.fsproj", "{4F721B43-B4A2-4773-A18A-6AE5220F1D03}"
-EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "MusiclandSolitaire.Core", "MusiclandSolitaire.Core\MusiclandSolitaire.Core.fsproj", "{9F95C722-1018-471A-9295-A41E9F2C1CB6}"
 EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "MusiclandSolitaire.iOS", "MusiclandSolitaire.iOS\MusiclandSolitaire.iOS.fsproj", "{5F8187A9-3D82-4F13-A60E-81830117BC6C}"
@@ -15,14 +13,6 @@ Global
 		Debug|iPhone = Debug|iPhone
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Debug|iPhoneSimulator.ActiveCfg = Debug|iPhoneSimulator
-		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Debug|iPhoneSimulator.Build.0 = Debug|iPhoneSimulator
-		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Release|iPhone.ActiveCfg = Release|iPhone
-		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Release|iPhone.Build.0 = Release|iPhone
-		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Release|iPhoneSimulator.ActiveCfg = Release|iPhoneSimulator
-		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Release|iPhoneSimulator.Build.0 = Release|iPhoneSimulator
-		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Debug|iPhone.ActiveCfg = Debug|iPhone
-		{4F721B43-B4A2-4773-A18A-6AE5220F1D03}.Debug|iPhone.Build.0 = Debug|iPhone
 		{9F95C722-1018-471A-9295-A41E9F2C1CB6}.Debug|iPhoneSimulator.ActiveCfg = Debug|Any CPU
 		{9F95C722-1018-471A-9295-A41E9F2C1CB6}.Debug|iPhoneSimulator.Build.0 = Debug|Any CPU
 		{9F95C722-1018-471A-9295-A41E9F2C1CB6}.Release|iPhone.ActiveCfg = Release|Any CPU
