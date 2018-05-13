@@ -10,6 +10,7 @@
     <RootNamespace>MusiclandSolitaire.iOS</RootNamespace>
     <AssemblyName>MusiclandSolitaire.iOS</AssemblyName>
     <IPhoneResourcePrefix>Resources</IPhoneResourcePrefix>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|iPhoneSimulator' ">
     <DebugSymbols>true</DebugSymbols>
@@ -99,6 +100,12 @@
     <Compile Include="AppDelegate.fs" />
     <Compile Include="Main.fs" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MusiclandSolitaire.Core\MusiclandSolitaire.Core.fsproj">
+      <Project>{9F95C722-1018-471A-9295-A41E9F2C1CB6}</Project>
+      <Name>MusiclandSolitaire.Core</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.FSharp.targets" />
 </Project>

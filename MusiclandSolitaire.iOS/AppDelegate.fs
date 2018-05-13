@@ -5,6 +5,8 @@ open System
 open UIKit
 open Foundation
 
+open Model
+
 [<Register ("AppDelegate")>]
 type AppDelegate () =
     inherit UIApplicationDelegate ()
