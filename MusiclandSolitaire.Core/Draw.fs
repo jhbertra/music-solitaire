@@ -2,6 +2,8 @@
 
 open FsGame.Core
 
+open FSharpPlus
+
 open Aether
 open Aether.Operators
 
@@ -107,7 +109,7 @@ let cardBack = ["CardBack"]
 let cardFront (Card ( suit , face ) ) = [getFaceContent face; getSuitContent suit]
 
 
-let background =
+let background model =
     let position = Point (0.0, 0.0)
     Sprite 
       ( ["Table"]
@@ -118,7 +120,7 @@ let background =
         position = position
         tapHandler = None
         touchDownHandler = None
-        touchUpHandler = Some handleTouchUp
+        touchUpHandler = if not (Option.isNone model.hand) then Some handleTouchUp else None
         dragHandler = Some (fun id delta _ -> Move (id, delta))
         stopTouchPropagation = true
         overlapHandler = None
@@ -200,10 +202,10 @@ let stock model =
 
 
 let faceUpPile hand cards origin position =
-    let dragHandler =
+    let touchHandler =
         match hand with
         | Some _ -> None
-        | None -> ( Some ( fun id _ _ -> BeginMove ( origin , 1 , position , id ) ) )
+        | None -> ( Some ( fun id _ -> BeginMove ( origin , 1 , position , id ) ) )
 
     drawPile
         cards
@@ -212,9 +214,9 @@ let faceUpPile hand cards origin position =
                 position
                 true
                 ( handler ( CardTapped card ) )
+                touchHandler
                 None
                 None
-                dragHandler
                 card
         )
 
@@ -278,17 +280,17 @@ let tableau tableau ( x , y ) model =
                 pos
                 true
                 (CardTapped card |> handler)
-                None
-                None
                 ( match model.hand with
                   | Some _ -> None
                   | None ->
                       let length = List.length pile
                       if length > 0 then
-                          Some ( fun id _ _ -> BeginMove ( MoveOrigin.Tableau tableau , length , pos , id ) )
+                          Some ( fun id _ -> BeginMove ( MoveOrigin.Tableau tableau , length , pos , id ) )
                       else
                           None
                 )
+                None
+                None
                 card
         )
         (fun pos -> 
@@ -350,7 +352,12 @@ let moving model =
             touchUpHandler = None
             dragHandler = None
             stopTouchPropagation = false
-            overlapHandler = Some movingOverlap
+            overlapHandler =
+                if staging = None then
+                    printfn "true"
+                    Some movingOverlap
+                else
+                    None
             } 
           )
         :: drawFannedPile
@@ -361,7 +368,7 @@ let moving model =
 
 
 let draw model =
-    background
+    background model
     :: flipTalon
     :: reset
     :: stock model

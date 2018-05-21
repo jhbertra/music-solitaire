@@ -320,14 +320,13 @@ let commitMove touchId model =
 
 let cancelMove =
     stateOption {
-        let! hand = setAndExtractL modelHand (State (function (Some hand) -> (Some hand, None) | None -> (None, None)))
+        let! hand = clearL modelHand
         let cardsLens =
             match hand^.handOrigin with
             | MoveOrigin.Talon -> modelTalon
             | MoveOrigin.Foundation s -> modelFoundation s >-> foundationCards
             | MoveOrigin.Tableau t -> modelTableau t >-> tableauFaceUp
-        let! model = liftState get
-        do! put (Optic.map cardsLens ((@) (hand^.handCards)) model) |> liftState }
+        do! modifyState (Optic.map cardsLens ((@) (hand^.handCards))) |> liftState }
     |> State.exec
 
 

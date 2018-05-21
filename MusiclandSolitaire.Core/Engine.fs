@@ -21,7 +21,10 @@ let evalState initial (State f) = f initial |> fst
 let modify<'a> (f : 'a -> 'a) : State<'a,unit> = get >>= (put << f)
 
 let processMessage msg model gameTime wrapOperation =
-    if List.exists (function Step | Move _ -> false | _ -> true) [msg] then printfn "%A" msg else ()
+    if List.exists (function Step | Move _ -> false | _ -> true) [msg] then
+        printfn "%A" msg
+    else
+        ()
     if model.won && msg <> Reset then
         returnModel model
     else

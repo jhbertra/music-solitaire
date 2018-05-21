@@ -5,6 +5,7 @@ open FsGame.Core
 open FSharpPlus
 open Aether
 open Aether.Operators
+open FSharpPlus
 open FSharpPlus.Data
 
 
@@ -59,6 +60,8 @@ let setAndExtractP (prism : Prism<'a, 'b>) (State f : State<'b, 'c>) =
             | None -> (None, a)))
     |> State
 
+let clearL lens  = setAndExtractL lens (State (function (Some x) -> (Some x, None) | None -> (None, None)))
+
 type StateOptionBuilder() =
 
     member inline this.Bind(State s, f) = State (s >> (function (Some x, st) -> f x |> (fun (State s') -> s' st) | (None, st) -> (None, st)))
@@ -70,6 +73,12 @@ let stateOption = StateOptionBuilder()
 let liftOption (op : 'a option) : State<'b, 'a option> = State (fun st -> (op, st))
 
 let liftState (State s) = State (s >> first Some)
+
+let modifyState (f : 'a -> 'a) : State<'a, unit> =
+    monad {
+        let! s = get
+        do! put (f s)
+    }
 
 open FsGame.Touch
 
@@ -389,8 +398,8 @@ let canPlaceOnFoundation foundation ( Card ( suit , face ) ) =
 let canPlaceOnTableau tableau cards =
     match tableau,(List.rev cards) with
     | [],(Card (_,I) :: _) -> true
-    | (Card (targetSuit, targetFace) :: _),(Card (suit,face) :: _) -> 
-        isFace2Higher face targetFace && areAlternateSuits targetSuit suit 
+    | (Card (targetSuit, targetFace) :: _),(Card (suit,face) :: _) ->
+        isFace2Higher face targetFace && areAlternateSuits targetSuit suit
     | _ -> false
 
 
