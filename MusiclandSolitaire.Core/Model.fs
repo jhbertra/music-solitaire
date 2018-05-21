@@ -5,6 +5,7 @@ open FsGame.Core
 open FSharpPlus
 open Aether
 open Aether.Operators
+open FSharpPlus.Data
 
 
 //
@@ -45,6 +46,30 @@ let gameTimeIsRunningSlowly : Lens<GameTime,bool> = (fun gt -> gt.isRunningSlowl
 let gameTimeTotal : Lens<GameTime,System.TimeSpan> = (fun gt -> gt.total) , (fun total gt -> { gt with total = total })
 
 let optionSome : Prism<'a option, 'a> = (id , (fun x -> Some x |> konst))
+
+let extractL (lens : Lens<'a, 'b>) (f : 'b -> 'c) = Optic.get lens >> f
+let extractP (prism : Prism<'a, 'b>) (f : 'b -> 'c) = Optic.get prism >> map f
+let setAndExtractL (lens : Lens<'a, 'b>) (State f : State<'b, 'c>) = (fun a -> Optic.get lens a |> f |> second (flip (Optic.set lens) a)) |> State
+let setAndExtractP (prism : Prism<'a, 'b>) (State f : State<'b, 'c>) =
+    (fun a ->
+        Optic.get prism a
+        |> map f
+        |> (function
+            | Some (c, b) -> (Some c, Optic.set prism b a)
+            | None -> (None, a)))
+    |> State
+
+type StateOptionBuilder() =
+
+    member inline this.Bind(State s, f) = State (s >> (function (Some x, st) -> f x |> (fun (State s') -> s' st) | (None, st) -> (None, st)))
+
+    member inline this.Return x = State (fun st -> (Some x, st))
+
+let stateOption = StateOptionBuilder()
+
+let liftOption (op : 'a option) : State<'b, 'a option> = State (fun st -> (op, st))
+
+let liftState (State s) = State (s >> first Some)
 
 open FsGame.Touch
 
@@ -216,7 +241,7 @@ let modelFoundation : Suit -> Lens<Model, Foundation> = function
 | Hearts -> (fun m -> m.heartsFoundation) , (fun (Foundation (cards,_)) m -> { m with heartsFoundation = Foundation (cards,Hearts) })
 | Spades -> (fun m -> m.spadesFoundation) , (fun (Foundation (cards,_)) m -> { m with spadesFoundation = Foundation (cards,Spades) })
 | Diamonds -> (fun m -> m.diamondsFoundation) , (fun (Foundation (cards,_)) m -> { m with diamondsFoundation = Foundation (cards,Diamonds) })
-| Clubs -> (fun m -> m.heartsFoundation) , (fun (Foundation (cards,_)) m -> { m with heartsFoundation = Foundation (cards,Clubs) })
+| Clubs -> (fun m -> m.clubsFoundation) , (fun (Foundation (cards,_)) m -> { m with clubsFoundation = Foundation (cards,Clubs) })
 let modelTableau : TableauNumber -> Lens<Model, Tableau> = function
 | Tableau1 -> (fun m -> m.tableau1) , (fun t m -> { m with tableau1 = t })
 | Tableau2 -> (fun m -> m.tableau2) , (fun t m -> { m with tableau2 = t })
@@ -225,7 +250,7 @@ let modelTableau : TableauNumber -> Lens<Model, Tableau> = function
 | Tableau5 -> (fun m -> m.tableau5) , (fun t m -> { m with tableau5 = t })
 | Tableau6 -> (fun m -> m.tableau6) , (fun t m -> { m with tableau6 = t })
 | Tableau7 -> (fun m -> m.tableau7) , (fun t m -> { m with tableau7 = t })
-
+let modelHand : Lens<Model, Hand option> = (fun m -> m.hand) , (fun h m -> { m with hand = h })
 
 
 type DealState = {

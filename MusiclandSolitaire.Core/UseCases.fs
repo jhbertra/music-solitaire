@@ -8,6 +8,8 @@ open FSharpPlus.Operators
 open FsGame.Core
 
 open Model
+open FSharpPlus.Data
+open FSharpPlus.Data
 
 //
 // --------- Util ---------
@@ -109,7 +111,7 @@ let step gameTime model =
                 if progress = 1.0 then
                       None
                   else
-                      Some ( Unstaging unstaging )
+                      Optic.set (unstagingProgress) progress unstaging |> Unstaging |> Some
 
             returnModel { model with hand = hand |> (staging ^= handStaging) |> Some }
 
@@ -225,49 +227,28 @@ let recycleTalon model =
 //
 
 let pickUpCards origin count pos identifier model =
-    let cardsLens =
-        match (model.hand, origin, count) with
-        | (None, MoveOrigin.Talon , 1) -> modelTalon
-        | (None, MoveOrigin.Foundation s , 1) -> modelFoundation s >-> foundationCards
-        | (None, MoveOrigin.Tableau t , _) -> modelTableau t >-> tableauFaceUp
-        | _ -> (konst [], konst id)
-
-    { Optic.map cardsLens (List.skip count) model with
-        hand = Some(origin, model^.cardsLens |> List.take count, pos, identifier, None) }
+    monad {
+        let! cardsLens =
+            match (model.hand, origin, count) with
+            | (None, MoveOrigin.Talon , 1) -> Some modelTalon
+            | (None, MoveOrigin.Foundation s , 1) -> modelFoundation s >-> foundationCards |> Some
+            | (None, MoveOrigin.Tableau t , _) -> modelTableau t >-> tableauFaceUp |> Some
+            | _ -> None
+        return
+            { Optic.map cardsLens (List.skip count) model with
+                hand = Some(origin, model^.cardsLens |> List.take count, pos, identifier, None) }
+    }
+    |> Option.defaultValue model
 
 
 //
 // --------- Move the Hand ---------
 //
 
-let moveHand touchId ( Delta ( x , y ) ) model =
-    match model.hand with
-    | Some ( origin , cards , Point ( oldX , oldY ) , id , staging ) when id = touchId ->
-        { model with
-            hand = Some ( origin , cards , Point ( oldX + x , oldY + y ) , id , staging )
-            }
-
-    | _ -> model
-
-
-
-//
-// --------- Cancel a Move ---------
-//
-
-let cancelMove model =
-    monad {
-        let! hand = model.hand
-        let model = { model with hand = None }
-        let updateCards = (@) (hand^.handCards)
-        let cardsLens =
-            match hand^.handOrigin with
-            | MoveOrigin.Talon -> modelTalon
-            | MoveOrigin.Foundation s -> modelFoundation s >-> foundationCards
-            | MoveOrigin.Tableau t -> modelTableau t >-> tableauFaceUp
-
-        return Optic.map cardsLens updateCards model }
-    |> Option.defaultValue model
+let moveHand touchId ( Delta ( x , y ) ) =
+    Optic.map
+        (modelHand >-> optionSome >?> handLocation)
+        (fun (Point(oldX , oldY)) -> Point(oldX + x, oldY + y))
 
 
 
@@ -275,11 +256,14 @@ let cancelMove model =
 // --------- Stage a Move ---------
 //
 
-let stageMove target point gameTime model =
-    { model with
-        hand = model.hand
-            |> Option.filter (Optic.get handStaging >> Option.isNone)
-            |> Option.map (fun hand -> Optic.set handStaging (Some(Staged(StagedModel(target, hand^.handLocation, point, 0.0, gameTime, false)))) hand) }
+let stageMove target point gameTime =
+    Optic.map
+        (modelHand >-> optionSome)
+        (fun hand ->
+            Optic.map
+                (handStaging)
+                (Some << Option.defaultValue (StagedModel(target, hand^.handLocation, point, 0.0, gameTime, false) |> Staged))
+                hand)
 
 
 
@@ -287,15 +271,16 @@ let stageMove target point gameTime model =
 // --------- Unstage a Move ---------
 //
 
-let unstageMove model =
-    { model with
-        hand = monad {
-            let! hand = model.hand
-            let! s = hand^.(handStaging >-> optionSome >?> staged)
+let unstageMove =
+    Optic.map
+        (modelHand >-> optionSome >?> handStaging >?> optionSome)
+        (function
+        | Staged s ->
             let origin = s^.stagedOrigin
             let dest = s^.stagedDest
             let progress = s^.stagedProgress
-            return hand |> Optic.set (handStaging >-> optionSome >?> unstaging) (UnstagingModel (lerp origin dest progress, 0.0)) } }
+            UnstagingModel (lerp origin dest progress, 0.0) |> Unstaging
+        | s -> s)
 
 
 
@@ -305,30 +290,46 @@ let unstageMove model =
 
 let commitMove touchId model =
     monad {
-        let! hand = model.hand
+        let! hand = model^.modelHand
         let handId = hand^.handTouchId
         let! s = hand^.(handStaging >-> optionSome >?> staged) |> filter (touchId = handId |> konst)
-        if s^.stagedPlayedSound then
-            return
-                match ( hand^.handCards , s^.stagedTarget ) with
-
+        let (model, cmd) =
+            match ( hand^.handCards , s^.stagedTarget ) with
                 | [card] , MoveTarget.Foundation f when canPlaceOnFoundation (model^.(modelFoundation f)) card ->
                     ( Optic.map (modelFoundation f) (pushCardToFoundation card) { model with hand = None }
-                    , [ Msg MoveCommitted ]
+                    , Msg MoveCommitted
                     )
-
                 | cards , MoveTarget.Tableau t when canPlaceOnTableau (model^.(modelTableau t >-> tableauFaceUp)) cards ->
                     ( Optic.map (modelTableau t >-> tableauFaceUp) ((@) cards) { model with hand = None }
-                    , [Msg MoveCommitted]
+                    , Msg MoveCommitted
                     )
-
-                | _ -> ( model , [ Msg CancelMove ] )
+                | _ -> ( model , Msg CancelMove )
+        if s^.stagedPlayedSound then
+            return (model, [cmd])
         else
-            return ( model , [ Msg ( PlayMoveSound [ CommitMove touchId ] ) ] ) }
+            return (model, cmd :: [Msg(PlayMoveSound[CommitMove touchId])]) }
     <|> monad {
         let! _ = model.hand |> filter (Optic.get handStaging >> Option.isNone)
         return ( model , [Msg CancelMove] ) }
     |> Option.defaultValue (returnModel model)
+
+
+
+//
+// --------- Cancel a Move ---------
+//
+
+let cancelMove =
+    stateOption {
+        let! hand = setAndExtractL modelHand (State (function (Some hand) -> (Some hand, None) | None -> (None, None)))
+        let cardsLens =
+            match hand^.handOrigin with
+            | MoveOrigin.Talon -> modelTalon
+            | MoveOrigin.Foundation s -> modelFoundation s >-> foundationCards
+            | MoveOrigin.Tableau t -> modelTableau t >-> tableauFaceUp
+        let! model = liftState get
+        do! put (Optic.map cardsLens ((@) (hand^.handCards)) model) |> liftState }
+    |> State.exec
 
 
 
