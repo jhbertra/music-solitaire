@@ -293,21 +293,20 @@ let commitMove touchId model =
         let! hand = model^.modelHand
         let handId = hand^.handTouchId
         let! s = hand^.(handStaging >-> optionSome >?> staged) |> filter (touchId = handId |> konst)
-        let (model, cmd) =
-            match ( hand^.handCards , s^.stagedTarget ) with
-                | [card] , MoveTarget.Foundation f when canPlaceOnFoundation (model^.(modelFoundation f)) card ->
-                    ( Optic.map (modelFoundation f) (pushCardToFoundation card) { model with hand = None }
-                    , Msg MoveCommitted
-                    )
-                | cards , MoveTarget.Tableau t when canPlaceOnTableau (model^.(modelTableau t >-> tableauFaceUp)) cards ->
-                    ( Optic.map (modelTableau t >-> tableauFaceUp) ((@) cards) { model with hand = None }
-                    , Msg MoveCommitted
-                    )
-                | _ -> ( model , Msg CancelMove )
         if s^.stagedPlayedSound then
-            return (model, [cmd])
+            return
+                match ( hand^.handCards , s^.stagedTarget ) with
+                    | [card] , MoveTarget.Foundation f when canPlaceOnFoundation (model^.(modelFoundation f)) card ->
+                        ( Optic.map (modelFoundation f) (pushCardToFoundation card) { model with hand = None }
+                        , [Msg MoveCommitted]
+                        )
+                    | cards , MoveTarget.Tableau t when canPlaceOnTableau (model^.(modelTableau t >-> tableauFaceUp)) cards ->
+                        ( Optic.map (modelTableau t >-> tableauFaceUp) ((@) cards) { model with hand = None }
+                        , [Msg MoveCommitted]
+                        )
+                    | _ -> ( model , [Msg CancelMove] )
         else
-            return (model, cmd :: [Msg(PlayMoveSound[CommitMove touchId])]) }
+            return (model, [Msg(PlayMoveSound[CommitMove touchId])]) }
     <|> monad {
         let! _ = model.hand |> filter (Optic.get handStaging >> Option.isNone)
         return ( model , [Msg CancelMove] ) }
