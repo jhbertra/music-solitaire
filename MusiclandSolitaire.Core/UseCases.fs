@@ -245,10 +245,10 @@ let pickUpCards origin count pos identifier model =
 // --------- Move the Hand ---------
 //
 
-let moveHand touchId ( Delta ( x , y ) ) =
-    Optic.map
+let moveHand touchId (Point (x, y)) =
+    Optic.set
         (modelHand >-> optionSome >?> handLocation)
-        (fun (Point(oldX , oldY)) -> Point(oldX + x, oldY + y))
+        (Point (x - 38.0, y - 56.0))
 
 
 

@@ -121,7 +121,7 @@ let background model =
         tapHandler = None
         touchDownHandler = None
         touchUpHandler = if not (Option.isNone model.hand) then Some handleTouchUp else None
-        dragHandler = Some (fun id delta _ -> Move (id, delta))
+        dragHandler = Some (fun id _ pos -> Move (id, pos))
         stopTouchPropagation = true
         overlapHandler = None
         }
@@ -326,7 +326,6 @@ let tableaus model =
 let movingOverlap = function
 | Overlap ( { id = TagId.Target target; position = point } , box ) when area box > 4000.0 ->
     StageMove ( target, point ) |> Some
-
 | _ -> None
 
 
@@ -352,12 +351,7 @@ let moving model =
             touchUpHandler = None
             dragHandler = None
             stopTouchPropagation = false
-            overlapHandler =
-                if staging = None then
-                    printfn "true"
-                    Some movingOverlap
-                else
-                    None
+            overlapHandler = if staging = None then Some movingOverlap else None
             } 
           )
         :: drawFannedPile

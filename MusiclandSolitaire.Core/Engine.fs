@@ -40,7 +40,7 @@ let processMessage msg model gameTime wrapOperation =
 
         | BeginMove (origin, count, pos, id) -> UseCases.pickUpCards origin count pos id model |> returnModel
 
-        | Move ( id , delta ) -> UseCases.moveHand id delta model |> returnModel
+        | Move ( id , pos ) -> UseCases.moveHand id pos model |> returnModel
 
         | CancelMove -> UseCases.cancelMove model |> returnModel
 

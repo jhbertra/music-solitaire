@@ -286,7 +286,7 @@ type Msg =
     | PreparePop
     | PopStock
     | BeginMove of MoveOrigin * int * Point * int
-    | Move of int * Delta
+    | Move of int * Point
     | CancelMove
     | StageMove of MoveTarget * Point
     | UnstageMove
