@@ -5,7 +5,6 @@ open FsGame.Core
 open FSharpPlus
 open Aether
 open Aether.Operators
-open FSharpPlus
 open FSharpPlus.Data
 
 
@@ -222,7 +221,7 @@ let handStaging : Lens<Hand, Staging option>= _5of5
 
 
 
-type Model = {
+type PlayingModel = {
     won : bool
     stock : Card list
     talon : Card list
@@ -238,20 +237,17 @@ type Model = {
     diamondsFoundation : Foundation
     clubsFoundation : Foundation
     hand : Hand option
-    rng : System.Random
     popReady : bool
-    pendingGestures : PendingGesture list
-    previousTouches : Touch list
     }
 
-let modelTalon : Lens<Model, Card list> = (fun m -> m.talon) , (fun t m -> { m with talon = t })
-let modelStock : Lens<Model, Card list> = (fun m -> m.stock) , (fun t m -> { m with stock = t })
-let modelFoundation : Suit -> Lens<Model, Foundation> = function
+let modelTalon : Lens<PlayingModel, Card list> = (fun m -> m.talon) , (fun t m -> { m with talon = t })
+let modelStock : Lens<PlayingModel, Card list> = (fun m -> m.stock) , (fun t m -> { m with stock = t })
+let modelFoundation : Suit -> Lens<PlayingModel, Foundation> = function
 | Hearts -> (fun m -> m.heartsFoundation) , (fun (Foundation (cards,_)) m -> { m with heartsFoundation = Foundation (cards,Hearts) })
 | Spades -> (fun m -> m.spadesFoundation) , (fun (Foundation (cards,_)) m -> { m with spadesFoundation = Foundation (cards,Spades) })
 | Diamonds -> (fun m -> m.diamondsFoundation) , (fun (Foundation (cards,_)) m -> { m with diamondsFoundation = Foundation (cards,Diamonds) })
 | Clubs -> (fun m -> m.clubsFoundation) , (fun (Foundation (cards,_)) m -> { m with clubsFoundation = Foundation (cards,Clubs) })
-let modelTableau : TableauNumber -> Lens<Model, Tableau> = function
+let modelTableau : TableauNumber -> Lens<PlayingModel, Tableau> = function
 | Tableau1 -> (fun m -> m.tableau1) , (fun t m -> { m with tableau1 = t })
 | Tableau2 -> (fun m -> m.tableau2) , (fun t m -> { m with tableau2 = t })
 | Tableau3 -> (fun m -> m.tableau3) , (fun t m -> { m with tableau3 = t })
@@ -259,13 +255,28 @@ let modelTableau : TableauNumber -> Lens<Model, Tableau> = function
 | Tableau5 -> (fun m -> m.tableau5) , (fun t m -> { m with tableau5 = t })
 | Tableau6 -> (fun m -> m.tableau6) , (fun t m -> { m with tableau6 = t })
 | Tableau7 -> (fun m -> m.tableau7) , (fun t m -> { m with tableau7 = t })
-let modelHand : Lens<Model, Hand option> = (fun m -> m.hand) , (fun h m -> { m with hand = h })
+let modelHand : Lens<PlayingModel, Hand option> = (fun m -> m.hand) , (fun h m -> { m with hand = h })
 
 
 type DealState = {
     tableauDealMoves : (TableauNumber * bool) list
-    model : Model
+    model : PlayingModel
     }
+
+
+type GameState =
+    | Playing of PlayingModel
+
+
+type Model = {
+    pendingGestures : PendingGesture list
+    previousTouches : Touch list
+    rng : System.Random
+    gameState : GameState
+    }
+
+
+let modelPlaying : Prism<Model, PlayingModel> = (function { gameState = Playing p } -> Some p | _ -> None), (fun p m -> { m with gameState = Playing p })
 
 
 
@@ -281,8 +292,7 @@ type TagId =
     | MovingBottom of Card
     | Target of MoveTarget
 
-type Msg =
-    | Step
+type PlayingMsg =
     | PreparePop
     | PopStock
     | BeginMove of MoveOrigin * int * Point * int
@@ -292,10 +302,14 @@ type Msg =
     | UnstageMove
     | CommitMove of int
     | MoveCommitted
-    | Reset
     | CardTapped of Card
     | FlipTalon
     | PlayMoveSound of Msg list
+
+and Msg =
+    | Step
+    | Reset
+    | PlayingMsg of PlayingMsg
 
 type Tag = {
     id : TagId

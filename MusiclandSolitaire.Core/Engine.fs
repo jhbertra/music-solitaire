@@ -2,13 +2,13 @@ module Engine
 
 open FSharpPlus
 open FSharpPlus.Data
-open FSharpPlus.Operators
 
 open FsGame
 open FsGame.Core
 
 open Model
 open Draw
+open Aether
 
 let optionToSingletonList = function
 | Some a -> [a]
@@ -20,46 +20,48 @@ let evalState initial (State f) = f initial |> fst
 
 let modify<'a> (f : 'a -> 'a) : State<'a,unit> = get >>= (put << f)
 
-let processMessage msg model gameTime wrapOperation =
-    if List.exists (function Step | Move _ -> false | _ -> true) [msg] then
-        printfn "%A" msg
-    else
-        ()
-    if model.won && msg <> Reset then
-        returnModel model
+let processPlaying msg gameTime wrapOperation playing =
+    if playing.won then
+        returnModel playing
     else
         match msg with
 
-        | Step -> UseCases.step gameTime model
+        | PreparePop -> returnModel { playing with popReady = true }
 
-        | Reset -> UseCases.initialize model.rng |> returnModel
+        | PopStock -> returnModel (UseCases.popStock playing)
 
-        | PreparePop -> returnModel { model with popReady = true }
+        | BeginMove (origin, count, pos, id) -> UseCases.pickUpCards origin count pos id playing |> returnModel
 
-        | PopStock -> UseCases.popStock model |> returnModel
+        | Move ( id , pos ) -> UseCases.moveHand id pos playing |> returnModel
 
-        | BeginMove (origin, count, pos, id) -> UseCases.pickUpCards origin count pos id model |> returnModel
+        | CancelMove -> UseCases.cancelMove playing |> returnModel
 
-        | Move ( id , pos ) -> UseCases.moveHand id pos model |> returnModel
+        | StageMove ( target, point ) -> UseCases.stageMove target point gameTime playing |> returnModel
 
-        | CancelMove -> UseCases.cancelMove model |> returnModel
+        | UnstageMove -> UseCases.unstageMove playing |> returnModel
 
-        | StageMove ( target, point ) -> UseCases.stageMove target point gameTime model |> returnModel
+        | CommitMove id -> UseCases.commitMove id playing
 
-        | UnstageMove -> UseCases.unstageMove model |> returnModel
-
-        | CommitMove id -> UseCases.commitMove id model
-
-        | MoveCommitted -> UseCases.checkForWin wrapOperation model
+        | MoveCommitted -> UseCases.checkForWin wrapOperation playing
 
         | CardTapped ( Card ( _ , face ) ) -> 
-            ( model
+            ( playing
             , [Cmd (PlaySound (getFaceContent face, (if face = KeySignature then NoOverlap else SoundMode.Overlap), 1.0))]
             )
 
-        | FlipTalon -> UseCases.recycleTalon model |> returnModel
+        | FlipTalon -> UseCases.recycleTalon playing |> returnModel
 
-        | PlayMoveSound nextMsgs -> UseCases.playMoveSound wrapOperation (nextMsgs |> List.map Msg) model
+        | PlayMoveSound nextMsgs -> UseCases.playMoveSound wrapOperation (nextMsgs |> List.map Msg) playing
+
+let processMessage msg gameTime (wrapOperation : Operation -> Update<Model, Touch.Touch list, Tag>) model =
+    match msg with
+    | Step -> UseCases.step gameTime model
+    | Reset -> UseCases.initialize model.rng |> returnModel
+    | PlayingMsg msg ->
+        (extractP modelPlaying (processPlaying msg gameTime wrapOperation)) model
+        |> map (arrFirst (arr (flip (Optic.set modelPlaying) model)))
+        |> Option.defaultValue (returnModel model)
+        
 
 
 let rec messagesFromGesture objects (id,gestureType) =
@@ -121,14 +123,14 @@ let rec sendMessages gameTime = function
     | (Cmd _) :: ops -> messages ops
     | (Msg msg) :: ops -> msg :: messages ops
 
-    let rec commands = function
+    let rec commands : Operation list -> Cmd<Model, Touch.Touch list, Tag> list = function
     | [] -> []
     | (Msg _) :: ops -> commands ops
     | (Cmd cmd) :: ops -> cmd :: commands ops
 
     monad {
         let! model = getModel
-        let model,nextOperations = processMessage msg model gameTime wrapOperation
+        let model,nextOperations = processMessage msg gameTime wrapOperation model
         do! modify (setModel model)
         do! commands nextOperations |> addCommands |> modify
         return! sendMessages gameTime ((messages nextOperations) @ msgs)

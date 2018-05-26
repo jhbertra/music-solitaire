@@ -53,7 +53,7 @@ let rec deal dealState = function
 
 let initialize rng =
 
-    let model = {
+    let gameState = {
         won = false
         stock = []
         talon = []
@@ -69,10 +69,7 @@ let initialize rng =
         diamondsFoundation = initFoundation Diamonds
         clubsFoundation = initFoundation Clubs
         hand = None
-        rng = rng
         popReady = false
-        pendingGestures = []
-        previousTouches = []
         }
 
     let deck =
@@ -85,10 +82,13 @@ let initialize rng =
         tableauDealMoves =
             let numberOrder = [1..7]
             numberOrder |> List.collect (fun i -> (List.skip (i-1) numberOrder) |> List.mapi (fun j num -> tableauNumber num,j=0))
-        model = model
+        model = gameState
         }
 
-    deal dealingState deck
+    { pendingGestures = []
+      previousTouches = []
+      rng = rng
+      gameState = Playing (deal dealingState deck) }
 
 
 
@@ -97,41 +97,43 @@ let initialize rng =
 //
 
 let step gameTime model =
-    let move gameTime progress =
-        let speed = (10.0 - 30.0) * progress + 30.0
-        let step = ((float gameTime.elapsed.TotalMilliseconds) * 0.001) * speed
-        min 1.0 (progress + step)
+    match model.gameState with
+    | Playing state ->
+        let move gameTime progress =
+            let speed = (10.0 - 30.0) * progress + 30.0
+            let step = ((float gameTime.elapsed.TotalMilliseconds) * 0.001) * speed
+            min 1.0 (progress + step)
 
-    match model.hand with
-    | Some hand ->
-        match hand^.handStaging with
-        | Some (Unstaging unstaging) ->
-            let progress = move gameTime (unstaging^.unstagingProgress)
-            let staging =
-                if progress = 1.0 then
-                      None
-                  else
-                      Optic.set (unstagingProgress) progress unstaging |> Unstaging |> Some
+        match state.hand with
+        | Some hand ->
+            match hand^.handStaging with
+            | Some (Unstaging unstaging) ->
+                let progress = move gameTime (unstaging^.unstagingProgress)
+                let staging =
+                    if progress = 1.0 then
+                          None
+                      else
+                          Optic.set (unstagingProgress) progress unstaging |> Unstaging |> Some
 
-            returnModel { model with hand = hand |> (staging ^= handStaging) |> Some }
+                returnModel { model with gameState = Playing { state with hand = hand |> (staging ^= handStaging) |> Some } }
 
-        | Some (Staged s) when distance (hand^.handLocation) (s^.stagedDest) |> abs <= 56.0 ->
-            let progress = move gameTime (s^.stagedProgress)
+            | Some (Staged s) when distance (hand^.handLocation) (s^.stagedDest) |> abs <= 56.0 ->
+                let progress = move gameTime (s^.stagedProgress)
 
-            let model = { model with hand = hand |> (progress ^= (handStaging >-> optionSome >?> staged >?> stagedProgress)) |> Some }
+                let model = { model with gameState = Playing { state with hand = hand |> (progress ^= (handStaging >-> optionSome >?> staged >?> stagedProgress)) |> Some } }
 
-            if not (s^.stagedPlayedSound) && gameTime.total.TotalMilliseconds - (s^.stagedTimeStaged).total.TotalMilliseconds >= 500.0 then
-                ( model, [ Msg ( PlayMoveSound [] ) ] )
-            else
-                returnModel model
-        | Some _ ->
-            ( model
-            , [ Msg UnstageMove ]
-            )
+                if not (s^.stagedPlayedSound) && gameTime.total.TotalMilliseconds - (s^.stagedTimeStaged).total.TotalMilliseconds >= 500.0 then
+                    ( model, [ Msg ( PlayingMsg ( PlayMoveSound [] ) ) ] )
+                else
+                    returnModel model
+            | Some _ ->
+                ( model
+                , [ Msg (PlayingMsg UnstageMove) ]
+                )
+
+            | _ -> returnModel model
 
         | _ -> returnModel model
-
-    | _ -> returnModel model
 
 
 
@@ -298,18 +300,18 @@ let commitMove touchId model =
                 match ( hand^.handCards , s^.stagedTarget ) with
                     | [card] , MoveTarget.Foundation f when canPlaceOnFoundation (model^.(modelFoundation f)) card ->
                         ( Optic.map (modelFoundation f) (pushCardToFoundation card) { model with hand = None }
-                        , [Msg MoveCommitted]
+                        , [Msg (PlayingMsg MoveCommitted)]
                         )
                     | cards , MoveTarget.Tableau t when canPlaceOnTableau (model^.(modelTableau t >-> tableauFaceUp)) cards ->
                         ( Optic.map (modelTableau t >-> tableauFaceUp) ((@) cards) { model with hand = None }
-                        , [Msg MoveCommitted]
+                        , [Msg (PlayingMsg MoveCommitted)]
                         )
-                    | _ -> ( model , [Msg CancelMove] )
+                    | _ -> ( model , [Msg (PlayingMsg CancelMove)] )
         else
-            return (model, [Msg(PlayMoveSound[CommitMove touchId])]) }
+            return (model, [Msg(PlayingMsg(PlayMoveSound[PlayingMsg(CommitMove touchId)]))]) }
     <|> monad {
         let! _ = model.hand |> filter (Optic.get handStaging >> Option.isNone)
-        return ( model , [Msg CancelMove] ) }
+        return ( model, [Msg (PlayingMsg CancelMove)] ) }
     |> Option.defaultValue (returnModel model)
 
 

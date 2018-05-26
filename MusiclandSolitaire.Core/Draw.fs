@@ -97,7 +97,7 @@ let cardSpacing = 32.0
 let withinBox (Point (x,y)) bwidth bheight (bx,by) = x >= bx && y >= by && x < bwidth + bx && y < bheight + by
 
 
-let handleTouchUp id _ = CommitMove id
+let handleTouchUp id _ = CommitMove id |> PlayingMsg
 
 
 let handler msg = Some (fun _ _ -> msg)
@@ -121,7 +121,7 @@ let background model =
         tapHandler = None
         touchDownHandler = None
         touchUpHandler = if not (Option.isNone model.hand) then Some handleTouchUp else None
-        dragHandler = Some (fun id _ pos -> Move (id, pos))
+        dragHandler = Some (fun id _ pos -> Move (id, pos) |> PlayingMsg)
         stopTouchPropagation = true
         overlapHandler = None
         }
@@ -137,7 +137,7 @@ let flipTalon =
       , {
         id = TagId.FlipTalon
         position = position
-        tapHandler = handler FlipTalon
+        tapHandler = handler (PlayingMsg FlipTalon)
         touchDownHandler = None
         touchUpHandler = None
         dragHandler = None
@@ -194,8 +194,8 @@ let stock model =
     drawCard
         ( Point stockPosition )
         false
-        ( if model.popReady then handler PopStock else None )
-        ( handler PreparePop )
+        ( if model.popReady then handler (PlayingMsg PopStock) else None )
+        ( handler (PlayingMsg PreparePop) )
         None
         None
     |> drawPile model.stock
@@ -205,7 +205,7 @@ let faceUpPile hand cards origin position =
     let touchHandler =
         match hand with
         | Some _ -> None
-        | None -> ( Some ( fun id _ -> BeginMove ( origin , 1 , position , id ) ) )
+        | None -> ( Some ( fun id _ -> BeginMove ( origin , 1 , position , id ) |> PlayingMsg ) )
 
     drawPile
         cards
@@ -213,7 +213,7 @@ let faceUpPile hand cards origin position =
             drawCard
                 position
                 true
-                ( handler ( CardTapped card ) )
+                ( handler ( PlayingMsg ( CardTapped card ) ) )
                 touchHandler
                 None
                 None
@@ -279,13 +279,13 @@ let tableau tableau ( x , y ) model =
             drawCard
                 pos
                 true
-                (CardTapped card |> handler)
+                (CardTapped card |> PlayingMsg |> handler)
                 ( match model.hand with
                   | Some _ -> None
                   | None ->
                       let length = List.length pile
                       if length > 0 then
-                          Some ( fun id _ -> BeginMove ( MoveOrigin.Tableau tableau , length , pos , id ) )
+                          Some ( fun id _ -> BeginMove ( MoveOrigin.Tableau tableau , length , pos , id ) |> PlayingMsg )
                       else
                           None
                 )
@@ -325,7 +325,7 @@ let tableaus model =
 
 let movingOverlap = function
 | Overlap ( { id = TagId.Target target; position = point } , box ) when area box > 4000.0 ->
-    StageMove ( target, point ) |> Some
+    StageMove ( target, point ) |> PlayingMsg |> Some
 | _ -> None
 
 
@@ -361,12 +361,13 @@ let moving model =
             ( fun _ -> [] )
 
 
-let draw model =
-    background model
+let draw = function
+| { gameState = Playing gameState } ->
+    background gameState
     :: flipTalon
     :: reset
-    :: stock model
-    @ talon model
-    @ foundations model
-    @ tableaus model
-    @ moving model
+    :: stock gameState
+    @ talon gameState
+    @ foundations gameState
+    @ tableaus gameState
+    @ moving gameState
